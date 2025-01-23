@@ -33,6 +33,8 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 target_link_libraries(${PROJECT_NAME} PRIVATE
     protobuf::libprotobuf
     xinput
+    d3d11
+    dxgi
 )
 
 # Tests
