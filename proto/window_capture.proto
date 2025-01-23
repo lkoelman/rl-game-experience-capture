@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package recorder;
+
+message WindowFrame {
+    uint32 timestamp = 1;
+    string window_title = 2;
+    uint32 width = 3;
+    uint32 height = 4;
+    bytes image_data = 5;
+}
+
+message WindowRecording {
+    repeated WindowFrame frames = 1;
+}
