@@ -1,5 +1,5 @@
 from conan import ConanFile
-from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps
+from conan.tools.cmake import cmake_layout
 
 class WinInputRecorderConan(ConanFile):
     name = "win_input_recorder"
@@ -15,6 +15,4 @@ class WinInputRecorderConan(ConanFile):
         self.tool_requires("cmake/3.27.1")
 
     def layout(self):
-        self.folders.source = "."
-        self.folders.build = "build"
-        self.folders.generators = "build"
+        cmake_layout(self)
