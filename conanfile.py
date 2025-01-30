@@ -8,11 +8,11 @@ class WinInputRecorderConan(ConanFile):
     generators = "CMakeDeps", "CMakeToolchain"
 
     def requirements(self):
-        self.requires("protobuf/5.27.0")
+        self.requires("protobuf/3.21.12")
 
     def build_requirements(self):
         self.tool_requires("cmake/3.27.1")
-        self.tool_requires("protobuf/5.27.0")
+        self.tool_requires("protobuf/3.21.12")
 
     def layout(self):
         cmake_layout(self)
