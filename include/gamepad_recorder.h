@@ -5,10 +5,10 @@
 #include <string>
 #include <fstream>
 
-class GamepadRecorder {
+class XinputGamepadRecorder {
 public:
-    GamepadRecorder();
-    ~GamepadRecorder();
+    XinputGamepadRecorder();
+    ~XinputGamepadRecorder();
 
     bool StartRecording(const std::string& output_file);
     void StopRecording();

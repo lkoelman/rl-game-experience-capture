@@ -9,7 +9,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(${PROJECT_NAME}
     src/main.cpp
     src/gamepad_recorder.cpp
-    src/window_recorder.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE

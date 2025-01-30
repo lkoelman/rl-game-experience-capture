@@ -3,18 +3,32 @@
 #include <chrono>
 #include <iostream>
 
-GamepadRecorder::GamepadRecorder()
+XinputGamepadRecorder::XinputGamepadRecorder()
     : recording_(false)
 {
 }
 
-GamepadRecorder::~GamepadRecorder() {
+XinputGamepadRecorder::~XinputGamepadRecorder() {
     StopRecording();
 }
 
-bool GamepadRecorder::StartRecording(const std::string& output_file) {
+bool XinputGamepadRecorder::StartRecording(const std::string& output_file) {
     if (recording_) {
         return false;
+    }
+
+    // Check if any gamepads are connected
+    bool gamepad_found = false;
+    for (DWORD i = 0; i < XUSER_MAX_COUNT; i++) {
+        XINPUT_STATE state;
+        if (XInputGetState(i, &state) == ERROR_SUCCESS) {
+            gamepad_found = true;
+            break;
+        }
+    }
+
+    if (!gamepad_found) {
+        std::cout << "Warning: No gamepads detected!\n";
     }
 
     output_file_ = output_file;
@@ -30,7 +44,7 @@ bool GamepadRecorder::StartRecording(const std::string& output_file) {
     return true;
 }
 
-void GamepadRecorder::StopRecording() {
+void XinputGamepadRecorder::StopRecording() {
     if (!recording_) {
         return;
     }
@@ -39,7 +53,7 @@ void GamepadRecorder::StopRecording() {
     csv_file_.close();
 }
 
-void GamepadRecorder::Update() {
+void XinputGamepadRecorder::Update() {
     if (!recording_) {
         return;
     }
@@ -50,7 +64,8 @@ void GamepadRecorder::Update() {
         if (XInputGetState(i, &state) == ERROR_SUCCESS) {
             auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::system_clock::now().time_since_epoch()).count();
-
+            
+            // Save state of gamepad i
             csv_file_ << timestamp << ","
                      << i << ","
                      << state.Gamepad.wButtons << ","
