@@ -37,9 +37,9 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/proto
 )
 
-# FIXME: should we use ${protobuf_LIBRARIES} instead of protobuf::protobuf
+# FIXME: should we use ${protobuf_LIBRARIES} instead of protobuf::protobuf or protobuf::libprotobuf
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    protobuf::protobuf
+    protobuf::libprotobuf
     xinput
     d3d11
     dxgi
