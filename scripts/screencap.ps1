@@ -71,30 +71,57 @@ Write-Host "Selected window: $windowTitle"
 Write-Host "Position: X=$windowX, Y=$windowY"
 Write-Host "Size: Width=$windowWidth, Height=$windowHeight"
 
+# Present capture method options
+Write-Host "`nChoose capture method:"
+Write-Host "1: Region capture (shows capture region overlay)"
+Write-Host "2: Window contents capture (captures window by title)"
+Write-Host "3: Desktop GPU capture (Windows 8+ Desktop Duplication API)"
+Write-Host "4: Desktop CPU capture (software processing)"
+
+# Get capture method selection
+do {
+    $methodSelection = Read-Host "Enter capture method (1-4)"
+    $validMethod = $methodSelection -match '^\d+$' -and [int]$methodSelection -ge 1 -and [int]$methodSelection -le 4
+    if (-not $validMethod) {
+        Write-Host "Invalid selection. Please enter a number between 1 and 4"
+    }
+} while (-not $validMethod)
+
 # Start screen capture
 $capture_start_iso = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffK"
 $capture_start_unix = Get-Date -UFormat %s
-ffmpeg -f gdigrab -framerate 30 -offset_x $windowX -offset_y $windowY `
-    -video_size "${windowWidth}x${windowHeight}" `
-    -i desktop -vf "scale=1280:-1" -movflags use_metadata_tags `
-    -metadata creation_time_iso8601="$capture_start_iso" `
-    -metadata creation_time_unix="$capture_start_unix" `
-    "${capture_start_unix}_capture.mkv"
+$output_file = "${capture_start_unix}_capture.mkv"
 
-
-
-# If you want to limit to a region, and show the area being grabbed:
-# (method='region')
-# >>> ffmpeg -f gdigrab -framerate 30 -offset_x 10 -offset_y 20 -video_size 640x480 -show_region 1 -i desktop output.mkv
-
-# To grab the contents of the window named "Calculator":
-# (method=window-contents)
-# >>> ffmpeg -f gdigrab -framerate 30 -i title=Calculator output.mkv
-
-# Use Windows 8+ Desktop Duplication API
-# (method=desktop-gpu)
-# >>> ffmpeg -init_hw_device d3d11va -filter_complex ddagrab=0 -c:v h264_nvenc -cq:v 20 output.mkv
-
-# Or downloaded and processed as usual, though with a bit of overhead compared to pure on-GPU processing:
-# (method=desktop-cpu)
-# >>> ffmpeg -filter_complex ddagrab=0,hwdownload,format=bgra -c:v libx264 -crf 20 output.mkv
+# Choose screen capture method, based on Ffmpeg docs: https://trac.ffmpeg.org/wiki/Capture/Desktop#Windows
+switch ($methodSelection) {
+    "1" { # Region capture
+        ffmpeg -f gdigrab -framerate 30 -offset_x $windowX -offset_y $windowY `
+            -video_size "${windowWidth}x${windowHeight}" `
+            -i desktop -vf "scale=1280:-1" -movflags use_metadata_tags `
+            -metadata creation_time_iso8601="$capture_start_iso" `
+            -metadata creation_time_unix="$capture_start_unix" `
+            $output_file
+    }
+    "2" { # Window contents capture
+        ffmpeg -f gdigrab -framerate 30 -i title="$windowTitle" `
+            -vf "scale=1280:-1" -movflags use_metadata_tags `
+            -metadata creation_time_iso8601="$capture_start_iso" `
+            -metadata creation_time_unix="$capture_start_unix" `
+            $output_file
+    }
+    "3" { # Desktop GPU capture
+        ffmpeg -init_hw_device d3d11va -filter_complex ddagrab=0 `
+            -c:v h264_nvenc -cq:v 20 -movflags use_metadata_tags `
+            -metadata creation_time_iso8601="$capture_start_iso" `
+            -metadata creation_time_unix="$capture_start_unix" `
+            $output_file
+    }
+    "4" { # Desktop CPU capture
+        ffmpeg -filter_complex "ddagrab=0,hwdownload,format=bgra" `
+            -c:v libx264 -crf 20 `
+            -movflags use_metadata_tags `
+            -metadata creation_time_iso8601="$capture_start_iso" `
+            -metadata creation_time_unix="$capture_start_unix" `
+            $output_file
+    }
+}
