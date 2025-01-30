@@ -18,6 +18,17 @@ WindowRecorder::~WindowRecorder() {
     CleanupDXGI();
 }
 
+/**
+ * @brief Starts recording the specified window and writes the output to a CSV file.
+ * 
+ * @param window_handle Handle to the window to be recorded.
+ * @param output_file Path to the output CSV file where the recording data will be saved.
+ * @return true if recording started successfully, false otherwise.
+ * 
+ * This function initializes the DXGI for capturing frames from the specified window.
+ * It also opens the output CSV file and writes the header. If recording is already
+ * in progress or if any initialization step fails, the function returns false.
+ */
 bool WindowRecorder::StartRecording(HWND window_handle, const std::string& output_file) {
     if (recording_) {
         return false;
@@ -31,6 +42,15 @@ bool WindowRecorder::StartRecording(HWND window_handle, const std::string& outpu
         return false;
     }
 
+    frame_counter_ = 0;
+    csv_file_.open(output_file_, std::ios::out);
+    if (!csv_file_.is_open()) {
+        return false;
+    }
+
+    // Write CSV header
+    csv_file_ << "frame_number,timestamp\n";
+
     recording_ = true;
     return true;
 }
@@ -41,39 +61,44 @@ void WindowRecorder::StopRecording() {
     }
 
     recording_ = false;
-
-    // Save recording to file
-    std::ofstream output(output_file_, std::ios::binary);
-    if (!recording_data_.SerializeToOstream(&output)) {
-        std::cerr << "Failed to write recording to file" << std::endl;
-    }
-
-    recording_data_.Clear();
+    csv_file_.close();
     CleanupDXGI();
 }
 
+/**
+ * @brief Updates the window recording process.
+ * 
+ * This function captures the current frame of the target window if recording is active.
+ * It retrieves the frame buffer, width, and height of the window. If a frame is successfully
+ * captured, it logs the frame number and timestamp to a CSV file. The actual frame encoding
+ * is currently omitted and will be implemented later.
+ * 
+ * @note This function does nothing if recording is not active.
+ */
 void WindowRecorder::Update() {
     if (!recording_) {
         return;
     }
 
     std::vector<uint8_t> frame_buffer;
+
+    // TODO: use the dimensions/location of target_window_, or capture window directly instead of using desktop duplication
     uint32_t width = 0, height = 0;
 
     if (GetFrame(frame_buffer, width, height)) {
-        auto* frame = recording_data_.add_frames();
-        frame->set_timestamp(std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()).count());
+        auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
         
         WCHAR title[256];
         GetWindowTextW(target_window_, title, 256);
         char narrow_title[256];
         WideCharToMultiByte(CP_UTF8, 0, title, -1, narrow_title, 256, NULL, NULL);
-        frame->set_window_title(narrow_title);
-        
-        frame->set_width(width);
-        frame->set_height(height);
-        frame->set_image_data(frame_buffer.data(), frame_buffer.size());
+
+        // append frame number and timestamp to csv
+        csv_file_ << frame_counter_ << "," << timestamp << "\n";
+        frame_counter_++;
+
+        // Placeholder: later we will encode the frame using ffmpeg, but for now we omit this
     }
 }
 
@@ -134,6 +159,27 @@ bool WindowRecorder::InitializeDXGI() {
     return true;
 }
 
+/**
+ * @brief Captures the next frame from the desktop duplication output.
+ * 
+ * @param buffer A reference to a vector that will be filled with the frame data.
+ * @param width A reference to a uint32_t that will be set to the width of the captured frame.
+ * @param height A reference to a uint32_t that will be set to the height of the captured frame.
+ * @return true if the frame was successfully captured, false otherwise.
+ * 
+ * This function captures the next frame from the desktop duplication output and stores the frame data in the provided buffer.
+ * It also sets the width and height of the captured frame. If the function fails to capture the frame, it returns false.
+ * The function performs the following steps:
+ * 1. Checks if the output duplication interface is valid.
+ * 2. Attempts to acquire the next frame from the output duplication interface.
+ * 3. Retrieves the texture interface from the acquired frame.
+ * 4. Gets the description of the texture to determine the frame dimensions.
+ * 5. Creates a staging texture for CPU access.
+ * 6. Copies the desktop texture to the staging texture.
+ * 7. Maps the staging texture to access the frame data.
+ * 8. Copies the frame data to the provided buffer.
+ * 9. Releases the resources and returns the result of the operation.
+ */
 bool WindowRecorder::GetFrame(std::vector<uint8_t>& buffer, uint32_t& width, uint32_t& height) {
     if (!output_duplication_) {
         return false;

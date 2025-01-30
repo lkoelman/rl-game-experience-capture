@@ -6,7 +6,7 @@
 #include <string>
 #include <memory>
 #include <vector>
-#include "window_capture.pb.h"
+#include <fstream>
 
 class WindowRecorder {
 public:
@@ -21,11 +21,13 @@ private:
     bool InitializeDXGI();
     bool GetFrame(std::vector<uint8_t>& buffer, uint32_t& width, uint32_t& height);
     void CleanupDXGI();
+    bool SaveFrameToFile(const std::vector<uint8_t>& buffer, uint32_t width, uint32_t height, const std::string& filename);
 
     bool recording_;
     HWND target_window_;
-    recorder::WindowRecording recording_data_;
+    std::ofstream csv_file_;
     std::string output_file_;
+    size_t frame_counter_;
 
     // DXGI resources
     ID3D11Device* d3d_device_;

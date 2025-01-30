@@ -3,7 +3,7 @@
 #include <windows.h>
 #include <xinput.h>
 #include <string>
-#include "gamepad_input.pb.h"
+#include <fstream>
 
 class GamepadRecorder {
 public:
@@ -16,6 +16,6 @@ public:
 
 private:
     bool recording_;
-    recorder::GamepadRecording recording_data_;
+    std::ofstream csv_file_;
     std::string output_file_;
 };

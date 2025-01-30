@@ -6,6 +6,10 @@
 #include <algorithm>
 #include "gamepad_recorder.h"
 #include "window_recorder.h"
+#include <ctime>
+#include <filesystem>
+#include <iomanip>
+#include <sstream>
 
 // Callback function for EnumWindows
 BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
@@ -88,6 +92,15 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    // Create directory with timestamp
+    std::time_t t = std::time(nullptr);
+    std::tm tm = *std::localtime(&t);
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y%m%d_%H%M%S");
+    std::string timestamp = oss.str();
+    std::string folder_name = timestamp + "_rl-exp";
+    std::filesystem::create_directory(folder_name);
+
     std::cout << "\nPress 'Q' to quit, 'R' to start/stop recording\n";
 
     GamepadRecorder gamepad_recorder;
@@ -99,13 +112,14 @@ int main(int argc, char* argv[]) {
         if (_kbhit()) {
             char ch = _getch();
             if (ch == 'q' || ch == 'Q') {
+                std::cout << "Stopped recording.\n";
                 break;
             }
             else if (ch == 'r' || ch == 'R') {
                 is_recording = !is_recording;
                 if (is_recording) {
-                    gamepad_recorder.StartRecording("gamepad_recording.pb");
-                    window_recorder.StartRecording(targetWindow, "window_recording.pb");
+                    gamepad_recorder.StartRecording(folder_name + "/gamepad_recording.csv");
+                    window_recorder.StartRecording(targetWindow, folder_name + "/window_recording.csv");
                 }
                 else {
                     gamepad_recorder.StopRecording();

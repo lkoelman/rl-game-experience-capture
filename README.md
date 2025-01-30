@@ -8,5 +8,5 @@ conan install . --build=missing [-c tools.env.virtualenv:powershell=powershell.e
 
 cd build
 cmake .. -DCMAKE_TOOLCHAIN_FILE="generators/conan_toolchain.cmake" -DCMAKE_BUILD_TYPE=Release
-cmake --build .
+cmake --build . --config Release
 ```
