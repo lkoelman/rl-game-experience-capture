@@ -9,16 +9,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(${PROJECT_NAME}
     src/main.cpp
     src/gamepad_recorder.cpp
+    src/sdl_input_recorder.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+find_package(SDL2 REQUIRED)
+
 target_link_libraries(${PROJECT_NAME} PRIVATE
     xinput
-    d3d11
-    dxgi
+    SDL2::SDL2
 )
 
 # Tests

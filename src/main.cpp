@@ -4,7 +4,8 @@
 #include <vector>
 #include <string>
 #include <algorithm>
-#include "gamepad_recorder.h"
+// #include "gamepad_recorder.h"
+#include "sdl_input_recorder.h"
 #include <ctime>
 #include <filesystem>
 #include <iomanip>
@@ -34,7 +35,8 @@ int main(int argc, char* argv[]) {
     std::cout << "\nPress 'Q' to top recording and quit\n";
 
     // For now, do window recording using external screen capture software (windows game bar, ffmpeg, gstreamer)
-    XinputGamepadRecorder gamepad_recorder;
+    SdlInputRecorder gamepad_recorder;
+    // XinputGamepadRecorder gamepad_recorder;
     // WindowRecorder window_recorder;
     
     gamepad_recorder.StartRecording(folder_name + "/gamepad_state.csv");
