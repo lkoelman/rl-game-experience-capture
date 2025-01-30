@@ -42,3 +42,15 @@
     * [Windows\.Gaming\.Input Namespace \- Windows apps \| Microsoft Learn](https://learn.microsoft.com/en-us/uwp/api/windows.gaming.input?view=winrt-26100 "Windows.Gaming.Input Namespace - Windows apps | Microsoft Learn")
     * [Gamepad Class \(Windows\.Gaming\.Input\) \- Windows apps \| Microsoft Learn](https://learn.microsoft.com/en-us/uwp/api/windows.gaming.input.gamepad?view=winrt-26100 "Gamepad Class \(Windows.Gaming.Input\) - Windows apps | Microsoft Learn")
     * [Microsoft\'s new GameInput API is going to open up so many possibilities \: r\/PeripheralDesign](https://www.reddit.com/r/PeripheralDesign/comments/1b259di/microsofts_new_gameinput_api_is_going_to_open_up/ "Microsoft\'s new GameInput API is going to open up so many possibilities : r/PeripheralDesign")
+
+
+- SDL2 notes
+    - game controllers
+        * [SDL2\/APIByCategory \- SDL2 Wiki](https://wiki.libsdl.org/SDL2/APIByCategory "SDL2/APIByCategory - SDL2 Wiki")
+        * [Beginner\-friendly demonstration using SDL2 to read from a joystick\.](https://gist.github.com/fabiocolacio/6af2ef76a706443adb210d23bd036d04 "Beginner-friendly demonstration using SDL2 to read from a joystick.")
+        * [A demonstration of using SDL2 to poll the state of buttons and axes on a joystick](https://gist.github.com/fabiocolacio/423169234b8daf876d8eb75d8a5f2e95 "A demonstration of using SDL2 to poll the state of buttons and axes on a joystick")
+        * [SDL\_GameController\: Making gamepads just work – rubenwardy\'s blog](https://blog.rubenwardy.com/2023/01/24/using_sdl_gamecontroller/ "SDL_GameController: Making gamepads just work – rubenwardy\'s blog")
+    - building and project layout
+        * [main\.cpp · main · rubenwardy \/ sdl\_gamecontroller\_example · GitLab](https://gitlab.com/rubenwardy/sdl_gamecontroller_example/-/blob/main/main.cpp?ref_type=heads "main.cpp · main · rubenwardy / sdl_gamecontroller_example · GitLab")
+        * [\[SDL2\.x\] WinMain vs\. main \- SDL Development \- Simple Directmedia Layer](https://discourse.libsdl.org/t/sdl2-x-winmain-vs-main/51334/4 "[SDL2.x] WinMain vs. main - SDL Development - Simple Directmedia Layer")
+        * [Getting started with the SDL2 library for Game Development](https://blog.conan.io/2023/07/20/introduction-to-game-dev-with-sdl2.html "Getting started with the SDL2 library for Game Development")
