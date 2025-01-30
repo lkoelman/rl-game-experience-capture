@@ -35,4 +35,7 @@ private:
     IDXGIOutputDuplication* output_duplication_;
     IDXGIOutput1* output_;
     DXGI_OUTPUT_DESC output_desc_;
+
+    // FFmpeg resources
+    SwsContext* sws_context_;
 };

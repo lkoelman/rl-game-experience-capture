@@ -30,6 +30,7 @@ WindowRecorder::~WindowRecorder() {
  * in progress or if any initialization step fails, the function returns false.
  */
 bool WindowRecorder::StartRecording(HWND window_handle, const std::string& output_file) {
+    
     if (recording_) {
         return false;
     }
@@ -39,6 +40,75 @@ bool WindowRecorder::StartRecording(HWND window_handle, const std::string& outpu
 
     if (!InitializeDXGI()) {
         std::cerr << "Failed to initialize DXGI" << std::endl;
+        return false;
+    }
+
+    // Initialize FFmpeg
+    avcodec_register_all();
+
+    // Create output file
+    video_file_ = fopen((output_file_ + ".h264").c_str(), "wb");
+    if (!video_file_) {
+        std::cerr << "Failed to open output file" << std::endl;
+        return false;
+    }
+
+    // Find H.264 encoder
+    codec_ = avcodec_find_encoder_by_name("libx264");
+    if (!codec_) {
+        std::cerr << "Failed to find H.264 encoder" << std::endl;
+        return false;
+    }
+
+    // Create codec context
+    codec_ctx_ = avcodec_alloc_context3(codec_);
+    if (!codec_ctx_) {
+        std::cerr << "Failed to allocate codec context" << std::endl;
+        return false;
+    }
+
+    // Configure codec context
+    codec_ctx_->width = 640;  // Set your desired width
+    codec_ctx_->height = 480; // Set your desired height
+    codec_ctx_->pix_fmt = AV_PIX_FMT_YUV420P;
+    codec_ctx_->time_base = AVRational{1, 1000}; // 1000 fps
+
+    // Open codec
+    if (avcodec_open2(codec_ctx_, codec_, nullptr) < 0) {
+        std::cerr << "Failed to open codec" << std::endl;
+        return false;
+    }
+
+    // Create frame
+    frame_ = av_frame_alloc();
+    if (!frame_) {
+        std::cerr << "Failed to allocate frame" << std::endl;
+        return false;
+    }
+
+    frame_->width = codec_ctx_->width;
+    frame_->height = codec_ctx_->height;
+    frame_->format = AV_PIX_FMT_YUV420P;
+
+    // Allocate frame buffers
+    av_frame_get_buffer(frame_, 32);
+    if (av_frame_make_writable(frame_) < 0) {
+        std::cerr << "Failed to make frame writable" << std::endl;
+        return false;
+    }
+
+    // Initialize SwsContext for format conversion
+    sws_context_ = sws_getContext(
+        codec_ctx_->width, codec_ctx_->height,  // Source width/height
+        AV_PIX_FMT_BGRA,                       // Source format (assuming your frame_buffer is in BGRA)
+        codec_ctx_->width, codec_ctx_->height,  // Destination width/height
+        AV_PIX_FMT_YUV420P,                     // Destination format
+        SWS_BICUBIC,                            // Scaling filter
+        nullptr, nullptr, nullptr               // No additional parameters
+    );
+
+    if (!sws_context_) {
+        std::cerr << "Failed to create SwsContext" << std::endl;
         return false;
     }
 
@@ -62,6 +132,38 @@ void WindowRecorder::StopRecording() {
 
     recording_ = false;
     csv_file_.close();
+
+    // Flush encoder
+    if (codec_ctx_) {
+        avcodec_send_frame(codec_ctx_, nullptr);
+        while (true) {
+            AVPacket packet;
+            av_init_packet(&packet, nullptr, 0);
+            if (avcodec_receive_packet(codec_ctx_, &packet) == AVERROR_EOF) {
+                break;
+            }
+            if (packet.size > 0) {
+                fwrite(packet.data, 1, packet.size, video_file_);
+            }
+            av_packet_unref(&packet);
+        }
+    }
+
+    // Cleanup FFmpeg resources
+    if (frame_) {
+        av_frame_free(&frame_);
+    }
+    if (codec_ctx_) {
+        avcodec_free_context(&codec_ctx_);
+    }
+    if (video_file_) {
+        fclose(video_file_);
+    }
+    if (sws_context_) {
+        sws_freeContext(sws_context_);
+        sws_context_ = nullptr;
+    }
+
     CleanupDXGI();
 }
 
@@ -89,16 +191,79 @@ void WindowRecorder::Update() {
         auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
         
-        WCHAR title[256];
-        GetWindowTextW(target_window_, title, 256);
-        char narrow_title[256];
-        WideCharToMultiByte(CP_UTF8, 0, title, -1, narrow_title, 256, NULL, NULL);
+        // Create AVFrame for the source format (BGRA)
+        AVFrame* source_frame = av_frame_alloc();
+        if (!source_frame) {
+            std::cerr << "Failed to allocate source frame" << std::endl;
+            return;
+        }
 
-        // append frame number and timestamp to csv
+        // Allocate source frame buffers
+        av_frame_get_buffer(source_frame, 32);
+        if (av_frame_make_writable(source_frame) < 0) {
+            std::cerr << "Failed to make source frame writable" << std::endl;
+            av_frame_free(&source_frame);
+            return;
+        }
+
+        // Copy frame data to source_frame
+        uint8_t* src_data[4] = { frame_buffer.data(), nullptr, nullptr, nullptr };
+        int src_linesize[4] = { static_cast<int>(frame_buffer.size() / height), 0, 0, 0 };
+        
+        av_image_copy_to_buffer(
+            source_frame->data, source_frame->linesize,
+            src_data, src_linesize,
+            AV_PIX_FMT_BGRA, height, 1
+        );
+
+        source_frame->width = width;
+        source_frame->height = height;
+        source_frame->format = AV_PIX_FMT_BGRA;
+
+        // Convert frame format using SwsContext
+        int ret = sws_scale(
+            sws_context_,
+            (const uint8_t* const*)source_frame->data,
+            source_frame->linesize,
+            0,
+            height,
+            frame_->data,
+            frame_->linesize
+        );
+
+        if (ret < 0) {
+            std::cerr << "Failed to convert frame format" << std::endl;
+            av_frame_free(&source_frame);
+            return;
+        }
+
+        // Send frame to encoder
+        int ret = avcodec_send_frame(codec_ctx_, frame_);
+        if (ret < 0) {
+            std::cerr << "Failed to send frame to encoder" << std::endl;
+            av_frame_free(&source_frame);
+            return;
+        }
+
+        // Receive encoded packets
+        AVPacket packet;
+        av_init_packet(&packet, nullptr, 0);
+        while (ret >= 0) {
+            ret = avcodec_receive_packet(codec_ctx_, &packet);
+            if (ret == AVERROR_EOF) {
+                break;
+            }
+            if (packet.size > 0) {
+                fwrite(packet.data, 1, packet.size, video_file_);
+            }
+            av_packet_unref(&packet);
+        }
+
+        // Update CSV
         csv_file_ << frame_counter_ << "," << timestamp << "\n";
         frame_counter_++;
 
-        // Placeholder: later we will encode the frame using ffmpeg, but for now we omit this
+        av_frame_free(&source_frame);
     }
 }
 
