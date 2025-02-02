@@ -1,5 +1,12 @@
 # Plan
 
+- [ ] video capture with precise frame time recovery
+    - A: ffmpeg
+        - 
+    - B: gstreamer-python
+        - set up gstreamer pipeline with `gst-python` and add a callback when new frame is received
+    - alternative: add into moonlight/sunshine source code
+        - guaranteed to have time-aligned gamepad state and video frames
 - [ ] define annotation pipeline
     - launch script for video + gamepad recording
         - cannot be both interactive

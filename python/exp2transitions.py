@@ -5,6 +5,7 @@ be stored in a replay buffer.
 
 import argparse
 import av
+import os
 from datetime import datetime, timedelta
 
 def main():
@@ -13,43 +14,53 @@ def main():
     )
     parser.add_argument("mp4_file", help="Path to the MP4 file.")
     parser.add_argument(
-        "--creation_time",
+        "--start-time",
         help=(
-            "Absolute timestamp of the first frame in ISO 8601 format "
-            "(e.g. '2023-01-05T12:34:56'). If not provided, the script "
-            "will attempt to read 'creation_time' from the MP4 metadata."
+            "How to determine the start time for the first frame. Can be: \n"
+            "'metadata' - read from MP4 metadata (default)\n"
+            "'ctime' - use file creation time\n"
+            "ISO 8601 timestamp (e.g. '2023-01-05T12:34:56')"
         ),
-        default=None,
+        default='ctime'
     )
 
     args = parser.parse_args()
 
-    # Open the MP4 container with PyAV.
+    # Open the MP4 container with PyAV
     container = av.open(args.mp4_file)
 
-    # Attempt to get the creation_time from command line or from metadata
-    creation_time_str = args.creation_time
-    if creation_time_str is None:
-        # MP4 containers often store a 'creation_time' in their metadata (in ISO format).
-        creation_time_str = container.format.metadata.get("creation_time", None)
-
-    # Try to parse the creation_time string into a datetime object
+    # Get start time based on the specified method
     absolute_start_dt = None
-    if creation_time_str:
-        # Some metadata strings might have a trailing 'Z' or fractional seconds.
-        # We'll do a simple replace for 'Z' and try datetime.fromisoformat.
-        # For more robust parsing, consider using 'dateutil.parser.parse'.
+    
+    if args.start_time == 'metadata':
+        # Try to get creation time from MP4 metadata
+        creation_time_str = container.format.metadata.get("creation_time", None)
+        if creation_time_str:
+            try:
+                # Remove trailing 'Z' if present
+                creation_time_str = creation_time_str.replace("Z", "")
+                absolute_start_dt = datetime.fromisoformat(creation_time_str)
+            except ValueError:
+                print(f"Warning: Could not parse metadata creation_time '{creation_time_str}' as ISO 8601.")
+                
+    elif args.start_time == 'ctime':
+        # Use file creation time
+        ctime = os.path.getctime(args.mp4_file)
+        absolute_start_dt = datetime.fromtimestamp(ctime)
+        
+    else:
+        # Try to parse as ISO 8601 timestamp
         try:
-            # fromisoformat does not handle a trailing 'Z' (UTC marker), so remove it if present:
-            creation_time_str = creation_time_str.replace("Z", "")
-            absolute_start_dt = datetime.fromisoformat(creation_time_str)
+            absolute_start_dt = datetime.fromisoformat(args.start_time)
         except ValueError:
-            # If parsing fails, we'll just warn and proceed without absolute times
-            print(f"Warning: Could not parse creation_time '{creation_time_str}' as ISO 8601. Ignoring.")
-            absolute_start_dt = None
+            print(f"Warning: Could not parse '{args.start_time}' as ISO 8601 timestamp.")
+
+    if absolute_start_dt is None:
+        raise ValueError("No valid start time found.")
 
     # Select the first video stream
     video_stream = container.streams.video[0]
+    frame_index = 0
 
     # Loop over packets in the container, then decode each packet to get frames
     for packet in container.demux(video_stream):
@@ -67,12 +78,14 @@ def main():
 
                 # TODO: add to replay buffer together with actions and rewards
                 print(
-                    f"Frame {frame.index} - "
+                    f"Frame {frame_index} - "
                     f"Relative: {frame_timestamp_sec:.4f} s - "
-                    f"Absolute: {frame_abs_time.isoformat()}"
+                    f"Absolute: {frame_abs_time.isoformat()} ({frame_abs_time.timestamp()})"
                 )
             else:
                 print(f"Frame {frame.index} - Relative: {frame_timestamp_sec:.4f} s")
+
+            frame_index += 1
 
 if __name__ == "__main__":
     main()
