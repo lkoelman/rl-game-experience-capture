@@ -44,6 +44,10 @@
     - this can be solved by writing the system timestamp when new frames become available
         - using a callback in GStreamer or ffmpeg
 
+
+- [ ] gamepad inputs with [SDL3 Python bindings](https://github.com/Aermoss/PySDL3)
+    - see `example.py`: based on this and C++ gamepad code, design python class for capturing gamepad state
+
 - [ ] should we switch from XInput API to Windows.Gaming.Input API?
     * good summary of different gamepad APIs: https://github.com/MysteriousJ/Joystick-Input-Examples?tab=readme-ov-file
     * [Windows\.Gaming\.Input Namespace \- Windows apps \| Microsoft Learn](https://learn.microsoft.com/en-us/uwp/api/windows.gaming.input?view=winrt-26100 "Windows.Gaming.Input Namespace - Windows apps | Microsoft Learn")
