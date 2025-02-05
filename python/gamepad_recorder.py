@@ -3,6 +3,7 @@ Records gamepad state to CSV files using SDL3.
 """
 
 import time
+import datetime
 import csv
 from pathlib import Path
 import sdl3
@@ -46,7 +47,7 @@ class SdlGamepadRecorder:
     Saves input data to CSV files with timestamps.
     """
 
-    def __init__(self, recording_path: Path):
+    def __init__(self, output_file: Path):
         """Initialize SDL and prepare for gamepad recording
         """
         if not sdl3.SDL_Init(sdl3.SDL_INIT_GAMEPAD | sdl3.SDL_INIT_EVENTS):
@@ -55,20 +56,13 @@ class SdlGamepadRecorder:
         # Allow background events
         sdl3.SDL_SetHint(sdl3.SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, b"1")
         
-        self._recording_path = recording_path
         self._gamepad = None
         self._csv_file = None
         self._csv_writer = None
         self._recording = False
 
-    def start_recording(self, output_file: str) -> bool:
-        """
-        Start recording gamepad input to the specified file
-        """
-        if self._recording:
-            return False
-
         # Try to find and open first available gamepad
+        # FIXME: we could fetch multiple gamepad by doing sdl3.SDL_GetGamepad(MAX_COUNT); foreach: sdl3.SDL_OpenGamepad(...)
         gamepad_ids = sdl3.SDL_GetGamepads(None)
         if not gamepad_ids:
             print("No gamepads detected!")
@@ -77,7 +71,6 @@ class SdlGamepadRecorder:
             # print(f"Found {len(list(gamepad_ids))} gamepads. Using fist one.")
             print("Found gamepad")
 
-        # FIXME: we could fetch multiple gamepad by doing sdl3.SDL_GetGamepad(MAX_COUNT); foreach: sdl3.SDL_OpenGamepad(...)
         self._joystick_id = gamepad_ids[0]
         self._gamepad = sdl3.SDL_OpenGamepad(self._joystick_id)
         if not self._gamepad:
@@ -86,7 +79,8 @@ class SdlGamepadRecorder:
         
         # Find out what buttons this controller has
         self._valid_buttons = (
-            button for button in SDL_GAMEPAD_BUTTONS if sdl3.SDL_GamepadHasButton(self._gamepad, button)
+            button for button in SDL_GAMEPAD_BUTTONS
+            if sdl3.SDL_GamepadHasButton(self._gamepad, button)
         )
 
         try:
@@ -107,17 +101,16 @@ class SdlGamepadRecorder:
             ])
             
             self._recording = True
-            return True
 
         except IOError as e:
             print(f"Failed to open output file: {e}")
             if self._gamepad:
                 sdl3.SDL_CloseGamepad(self._gamepad)
                 self._gamepad = None
-            return False
 
     def stop_recording(self):
-        """Stop recording and close files"""
+        """Stop recording and close files
+        """
         if not self._recording:
             return
 
@@ -202,11 +195,14 @@ class SdlGamepadRecorder:
 
             num_events += 1
 
-        print(f"Handled {num_events} events.")
+        if num_events > 0:
+            print(f"Handled {num_events} events.")
 
 
-    def record_fixed(self):
-        """Update gamepad state and record to file if recording"""
+    def record_gamepad_state(self):
+        """Save current gamepad state regardless of whether it was updated
+        (button/axis events received).
+        """
         if not self._recording or not self._gamepad:
             return
 
@@ -253,12 +249,14 @@ class SdlGamepadRecorder:
 
 
 if __name__ == '__main__':
-    recorder = SdlGamepadRecorder(Path("recordings"))
-    recorder.start_recording("gamepad_recording.csv")
+    dt = f"{datetime.datetime.now():%y-%m-%dT%H%M%S}"
+    recorder = SdlGamepadRecorder(f"gamepad_recording_{dt}.csv")
 
     try:
+        # TODO: can do at slower rate and handle more events
         while True:
             recorder.record_unhandled_events()
+            time.sleep(0.010)
     except KeyboardInterrupt:
         print("Shutting down")
     finally:
