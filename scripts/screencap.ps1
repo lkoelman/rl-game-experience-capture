@@ -92,6 +92,8 @@ $capture_start_iso = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffK"
 $capture_start_unix = Get-Date -UFormat %s
 $output_file = "${capture_start_unix}_capture.mkv"
 
+# TODO: launch gamepad recorder in a thread
+
 # Choose screen capture method, based on Ffmpeg docs: https://trac.ffmpeg.org/wiki/Capture/Desktop#Windows
 switch ($methodSelection) {
     "1" { # Region capture
