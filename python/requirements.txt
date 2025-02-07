@@ -1,2 +1,6 @@
 av
+decord
 PySDL3
+hydra-core
+pandas
+fastparquet

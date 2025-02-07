@@ -37,11 +37,12 @@ python frame_reader.py path/to/video.mp4 --creation_time "2025-01-30T12:00:00"
 ## Install Gstreamer Python on Windows
 
 Instructions adapted from https://fluendo.com/blog/gstreamer-python-bindings-for-windows/ .
-Test with gstreamer commmit `df7a8c8c406740d335dddcff1e6f4b58447df5e5`.
+Tested with gstreamer commmit `df7a8c8c406740d335dddcff1e6f4b58447df5e5`.
 
-Download `pkg-config` 'https://gstreamer.freedesktop.org/src/mirror/pkg-config.zip'
+Download `pkg-config` from [gstreamer repository](https://gstreamer.freedesktop.org/src/mirror/pkg-config.zip')
 or use script in `<repository>\gstreamer\subprojects\win-pkgconfig\download-binary.py`.
 
+In Windows PowerShell command prompt:
 ```powershell
 # Install meson build system (must use pip) and correct setuptools version
 python -m pip install meson "setuptools==68"
@@ -57,12 +58,14 @@ meson compile -C .\build
 meson install -C .\build
 ```
 
-Ensure gst python module is on PYTHONPATH:
+Test your installation:
 
 ```powershell
+# Ensure gst python module is on PYTHONPATH:
 $env:PYTHONPATH="C:/Users/lucas/.local/opt/gstreamer/lib/site-packages"
 ```
 
+Try the following python script:
 
 ```python
 import os
