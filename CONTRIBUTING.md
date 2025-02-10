@@ -702,14 +702,6 @@ These modifications should allow you to capture game state (health, shield, XP b
 Once we have an annotated dataset, we could use a CNN/ViT with a regression head to predict the values and states in a more robust
 and computationally efficient manner.
 
-# Torch Models in C++
-
-See https://www.reddit.com/r/pytorch/comments/xb5pxh/best_way_to_use_pytorch_model_in_a_c_application/
-- If you trace and script your model in python, you can directly run it in C++ via torch::jit::load(). Another way is to export it to ONNX and then load it in C++ via ONNX's C API. 
-    - this approach is documented in https://pytorch.org/tutorials/advanced/cpp_export.html
-- If you don’t care about inference speed, then libtorch is the easiest way. If inference latency is the highest priority then do pytorch -> onnx -> tensorrt. Or using onnx runtime might also be a good middle ground. 
-
-
 # Polygon ROI Extraction using PIL
 
 You are a software engineer. Please write a function that takes, given a list of 2d coordinates representing the vertices fo a polygon in image space, retrieves the pixels bounded by the polygon. Please suggested suitable python libraries such as numpy or PIL/pillow.
@@ -821,3 +813,27 @@ Recommended Libraries
     4. (Optional) scikit-image: Image processing utilities, including polygon rasterization (skimage.draw.polygon).
 
 Using Pillow and NumPy typically suffices for the basic task of extracting pixels within a polygon from an image.
+
+# Real-time Inference
+
+## Torch Models in C++
+
+See https://www.reddit.com/r/pytorch/comments/xb5pxh/best_way_to_use_pytorch_model_in_a_c_application/
+- If you trace and script your model in python, you can directly run it in C++ via torch::jit::load(). Another way is to export it to ONNX and then load it in C++ via ONNX's C API. 
+    - this approach is documented in https://pytorch.org/tutorials/advanced/cpp_export.html
+- If you don’t care about inference speed, then libtorch is the easiest way. If inference latency is the highest priority then do pytorch -> onnx -> tensorrt. Or using onnx runtime might also be a good middle ground. 
+
+
+## Zero-copy Gstreamer to Tensor (Python)
+
+* [A Simple and Flexible Pytorch Video Pipeline \| paulbridger.com](https://paulbridger.com/posts/video-analytics-pytorch-pipeline/ "A Simple and Flexible Pytorch Video Pipeline | paulbridger.com")
+* [Getting the pointer to CUDAMemory of a buffer - General Discussion - GStreamer Discourse](https://discourse.gstreamer.org/t/getting-the-pointer-to-cudamemory-of-a-buffer/600 "Getting the pointer to CUDAMemory of a buffer - General Discussion - GStreamer Discourse")
+* [Gstreamer NVMM memory buffer to torch tensor with zero copy - Intelligent Video Analytics / DeepStream SDK - NVIDIA Developer Forums](https://forums.developer.nvidia.com/t/gstreamer-nvmm-memory-buffer-to-torch-tensor-with-zero-copy/295501 "Gstreamer NVMM memory buffer to torch tensor with zero copy - Intelligent Video Analytics / DeepStream SDK - NVIDIA Developer Forums")
+* [deepstream_python_apps/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py at master · NVIDIA\-AI\-IOT\/deepstream\_python\_apps](https://github.com/NVIDIA-AI-IOT/deepstream_python_apps/blob/master/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py#L121 "deepstream_python_apps/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py at master · NVIDIA-AI-IOT/deepstream_python_apps")
+
+
+
+# Goal : Distributable with great UX
+
+Make it into a binary distributable (both capture and inference) that has a good UX
+so that it can be used by dummies.

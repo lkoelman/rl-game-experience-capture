@@ -2,7 +2,7 @@
 Extract Path of Exile 2 game state from video recording.
 """
 
-from .game_state import
+from .game_state import PlayerStats, UiStatus
 
 
 # Steps:
