@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 from enum import IntEnum
 import textwrap
+from typing import TypeAlias, Optional
 
 import cv2
 import numpy as np
@@ -13,10 +14,90 @@ from decord import VideoReader, cpu
 
 class AnnotationMode(IntEnum):
     SEEK = 1
+    # Drawing modes
     DRAW_RECT = 2
     DRAW_POLY = 3
-    DRAW_CIRCLE = 4
-    EDIT_ANNOTATION = 5
+    DRAW_ELLIPSE = 4
+    # Shape editing modes
+    EDIT_RECT = 5
+    EDIT_ELLIPSE = 6
+    EDIT_POLY = 7
+
+class PoeRoi(IntEnum):
+    """
+    Regions of interest for PoE2 UI.
+    """
+    HEALTH_GLOBE = 1
+    ENERGY_SHIELD = 2
+    MANA_GLOBE = 3
+    EXPERIENCE_BAR = 4
+    MINIMAP = 5
+    BUFFS_REGION = 6
+
+
+# TODO: Legend for each anotation mode
+LEGENDS = {
+    # TODO: show rectangle id (num) when i is pressed and select using integer
+    AnnotationMode.SEEK: textwrap.dedent(
+        """\
+        MODE: frame seeking
+        h: show help
+        j: next frame
+        k: prev frame
+        r: draw rect
+        c: draw ellipse
+        e: edit roi
+        d: delete roi
+        """
+    ),
+    # TODO: convenient roi editing keybindings
+    # - arrows to move
+    # - shift-arrow to resize 
+    AnnotationMode.DRAW_RECT: textwrap.dedent(
+        """\
+        MODE: rectangle annotation
+        (Draw four corners, counter-clockwise)
+        h: show help
+        """
+    ),
+    AnnotationMode.EDIT_RECT: textwrap.dedent(
+        """\
+        MODE: rectangle editing (Move corners)
+        h: show help
+        UP/DOWN/L/R: move rect
+        SHIFT+U/D: move top border
+        CTRL+U/D: move bottom border
+        SHIFT+L/R: move left border
+        CTRL+L/R: move right border
+        """
+    ),
+    AnnotationMode.DRAW_ELLIPSE: textwrap.dedent(
+        """\
+        MODE: ellipse annotation
+        (Draw center, r1, r2)
+        h: show help
+        """
+    ),
+    AnnotationMode.EDIT_ELLIPSE: textwrap.dedent(
+        """\
+        MODE: ellipse editing
+        (edit center, r1, r2)
+        h: show help
+        UP/DOWN/L/R: move
+        SHIFT+U/D: resize r1
+        SHIFT+L/R: resize r2
+        """
+    ),
+    AnnotationMode.DRAW_POLY: textwrap.dedent(
+        """\
+        MODE: polygon annotation
+        (Draw vertices, counter-clockwise)
+        h: show help
+        """
+    )
+}
+
+PolygonCoords: TypeAlias = list[tuple[float, float]]
 
 class VideoAnnotator:
     """
@@ -24,33 +105,14 @@ class VideoAnnotator:
     """
 
     def __init__(self):
-        self.polygons_per_frame = {}  # Dictionary: frame_index -> list of polygons (each is a list of (x, y) points)
-        self.current_polygon = []     # Points of the polygon currently being drawn
+        self.polygons_per_frame: dict[PoeRoi] = {}  # Dictionary: frame_index -> list of polygons (each is a list of (x, y) points)
+        self.current_polygon: PolygonCoords = []     # Points of the polygon currently being drawn
         self.current_frame_index = 0
+        self.current_roi: Optional[PoeRoi] = None
 
         self.WINDOW_NAME = "Annotation Tool"
 
-        # TODO: store and draw current legend depending on mode
-        self.legend = textwrap.dedent(
-            """\
-            h: show help
-            j: next frame
-            k: prev frame
-            r: draw rect
-            c: draw circle
-            e: draw elipse
-            i: select roi
-            """)
-
-        # TODO: show rectangle id (num) when i is pressed and select using integer
-
-        self.mode: AnnotationMode
-
-        # TODO: click existing poly detection -> store img masks for current polys and check pixel hit?
-
-        # TODO: convenient roi editing keybindings
-        # - arrows to move
-        # - shift-arrow to resize 
+        self.mode = AnnotationMode.SEEK
     
 
     def draw_polygons(self, image, polygons, current_polygon=None):
@@ -75,6 +137,7 @@ class VideoAnnotator:
         """
         Mouse callback for drawing polygons.
         """
+        # TODO: callbacks depending on the mode we are in
 
         if event == cv2.EVENT_LBUTTONDOWN:
             # Left-click: add a point to the current polygon
@@ -90,6 +153,7 @@ class VideoAnnotator:
 
             # Reset the current polygon
             self.current_polygon = []
+
 
     def run(self, video_path: Path):
         """
@@ -135,6 +199,7 @@ class VideoAnnotator:
             key = cv2.waitKey(30)
             key_alpha = key & 0xFF  # alphanumeric keys
             
+            # TODO: add state machine to switch between drawing modes
             if key_alpha == ord('q'):
                 break
             
