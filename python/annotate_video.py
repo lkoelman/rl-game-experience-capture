@@ -145,19 +145,21 @@ class VideoAnnotator:
         self.current_mouse_pos = (x, y)
         
         if self.mode == AnnotationMode.DRAW_RECT:
-            self.draw_rect_callback(event, x, y, flags, param)
+            self.mode_drawrect_callback(event, x, y, flags, param)
         elif self.mode == AnnotationMode.DRAW_ELLIPSE:
-            self.draw_ellipse_callback(event, x, y, flags, param)
+            self.mode_drawellipse_callback(event, x, y, flags, param)
         elif self.mode == AnnotationMode.EDIT_RECT:
             self.edit_rect_callback(event, x, y, flags, param)
         elif self.mode == AnnotationMode.EDIT_ELLIPSE:
             self.edit_ellipse_callback(event, x, y, flags, param)
         elif self.mode == AnnotationMode.DRAW_POLY:
-            self.draw_polygon_callback(event, x, y, flags, param)
+            self.mode_drawpoly_callback(event, x, y, flags, param)
 
 
-    def draw_rect_callback(self, event, x, y, flags, param):
-        """Mouse callback for rectangle drawing mode."""
+    def mode_drawrect_callback(self, event, x, y, flags, param):
+        """
+        Mouse callback for rectangle drawing mode.
+        """
         if event == cv2.EVENT_LBUTTONDOWN:
             if not self.current_points:
                 self.current_points = [(x, y)]
@@ -172,8 +174,10 @@ class VideoAnnotator:
                 self.current_points = []
                 self.mode = AnnotationMode.SEEK
 
-    def draw_ellipse_callback(self, event, x, y, flags, param):
-        """Mouse callback for ellipse drawing mode."""
+    def mode_drawellipse_callback(self, event, x, y, flags, param):
+        """
+        Mouse callback for ellipse drawing mode.
+        """
         if event == cv2.EVENT_LBUTTONDOWN:
             if not self.current_points:
                 self.current_points = [(x, y)]  # Center point
@@ -189,7 +193,7 @@ class VideoAnnotator:
                 self.mode = AnnotationMode.SEEK
 
 
-    def draw_polygon_callback(self, event, x, y, flags, param):
+    def mode_drawpoly_callback(self, event, x, y, flags, param):
         """
         Mouse callback for drawing polygons.
         """
@@ -251,7 +255,48 @@ class VideoAnnotator:
                 cv2.polylines(overlay, [pts], isClosed=False, color=(255, 0, 0), thickness=2)
         
         return overlay
+    
 
+    def draw_roi_numbers(self, image):
+        """
+        Draw the ROI id/number in the center of each ROI shape.
+        """
+        for roi_type, shape in self.shapes.items():
+            # Get integer value of ROI enum for display
+            roi_number = int(roi_type)
+
+            if shape['type'] == 'rect':
+                pt1, pt2 = shape['coords']
+                # Calculate center of rectangle
+                center_x = (pt1[0] + pt2[0]) // 2
+                center_y = (pt1[1] + pt2[1]) // 2
+
+            elif shape['type'] == 'ellipse':
+                center, _, _ = shape['coords']
+                center_x, center_y = center
+
+            elif shape['type'] == 'polygon':
+                # For polygon, calculate centroid
+                pts = np.array(shape['coords'])
+                center_x = int(np.mean(pts[:, 0]))
+                center_y = int(np.mean(pts[:, 1]))
+
+            # Draw the ROI number
+            text = str(roi_number)
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 1.0
+            thickness = 2
+
+            # Get text size to center it properly
+            (text_width, text_height), _ = cv2.getTextSize(text, font, font_scale, thickness)
+            text_x = center_x - text_width // 2
+            text_y = center_y + text_height // 2
+
+            # Draw text with contrasting outline for visibility
+            cv2.putText(image, text, (text_x, text_y), font, font_scale, (0, 0, 0), thickness + 2)
+            cv2.putText(image, text, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
+
+        return image
 
     def run(self, video_path: Path):
         """
@@ -294,21 +339,26 @@ class VideoAnnotator:
             key = cv2.waitKey(30)
             key_alpha = key & 0xFF
 
-            # TODO: fix state machine for annotation modes
+            # TODO: fix state machine for annotation modes : the allowed key presses should be nested inside if-blocks depending on the annotation mode
 
             if key_alpha == ord('q'):
                 break
+            
             elif key_alpha == ord('r'):
                 self.mode = AnnotationMode.DRAW_RECT
                 self.current_points = []
+            
             elif key_alpha == ord('c'):
                 self.mode = AnnotationMode.DRAW_ELLIPSE
                 self.current_points = []
+            
             elif key_alpha == ord('e'):
                 # Show ROI numbers and wait for selection
-                self.show_roi_numbers()
+                img = self.draw_roi_numbers(display_img)
+                cv2.imshow(self.WINDOW_NAME, img)
                 roi_key = cv2.waitKey(0) & 0xFF
                 try:
+                    # Retrieve ROI for editing
                     self.current_roi = PoeRoi(int(chr(roi_key)))
                     if self.current_roi in self.shapes:
                         shape = self.shapes[self.current_roi]
@@ -357,8 +407,6 @@ def main(video_path: Path):
     annotator.run(video_path)
 
     
-
-
 
 if __name__ == "__main__":
 
