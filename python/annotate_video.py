@@ -60,17 +60,11 @@ WASD_CAPS_UP = ord('W')
 WASD_CAPS_DOWN = ord('S')
 WASD_CAPS_LEFT = ord('A')
 WASD_CAPS_RIGHT = ord('D')
-WASD_KEYS = [ord(c) for c in 'wasd']
-WASD_CAPS_KEYS = [ord(c) for c in 'WASD']
+WASD_LOWER_KEYS = tuple((ord(c) for c in 'wasd'))
+WASD_CAPS_KEYS = tuple((ord(c) for c in 'WASD'))
 
 LEGENDS = {
-    # Seek mode
-    # - use can seek in the video/skip between frames
-    # - enter different ROI drawing/editing modes
-    # - when (e) or (d) is pressed to edit or draw an ROI:
-    #   first display their integer enum numbers in the center of each ROI,
-    #   and let user select with number keypress. Depending on the ROI that's
-    #   selected for editing, enter the corresponding ROI editing mode
+    # Frame seek mode
     AnnotationMode.SEEK: textwrap.dedent(
         """\
         MODE: frame seeking (frame {frame_number})
@@ -107,7 +101,7 @@ LEGENDS = {
     # - shift-arrow to resize
     AnnotationMode.EDIT_RECT: textwrap.dedent(
         """\
-        MODE: rectangle editing (Move corners)
+        MODE: rectangle editing (dpx={dpx})
         h: show help
         esc: return
         UP/DOWN/L/R: move rect
@@ -124,7 +118,7 @@ LEGENDS = {
     ),
     AnnotationMode.EDIT_ELLIPSE: textwrap.dedent(
         """\
-        MODE: ellipse editing
+        MODE: ellipse editing (dpx={dpx})
         (edit center, rv, rh)
         h: show help
         esc: return
@@ -162,23 +156,7 @@ class VideoAnnotator:
         self.shift_pressed = False
         self.ctrl_pressed = False
         self.show_legend = True
-
-
-    def draw_legend(self, image):
-        """
-        Draw the current annotation mode's legend on the image.
-        """
-        legend_text = LEGENDS.get(self.mode, "")
-        if self.mode == AnnotationMode.SEEK:
-            legend_text = legend_text.format(frame_number=self.current_frame_index)
-        lines = legend_text.split('\n')
-
-        y = 30  # Starting y position
-        for line in lines:
-            cv2.putText(image, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6, (73, 235, 52), 2)
-            y += 25
-        return image
+        self.dpx = 1  # pixel resolution used for resize/translate operations
 
     # ========================================================================
     # Mouse callbacks for each FSM state / annotation mode
@@ -203,7 +181,7 @@ class VideoAnnotator:
         #     self.edit_rect_callback(event, x, y, flags, param)
         # elif self.mode == AnnotationMode.EDIT_ELLIPSE:
         #     self.edit_ellipse_callback(event, x, y, flags, param)
-        
+
 
     def mode_drawrect_callback(self, event, x, y, flags, param):
         """
@@ -261,10 +239,32 @@ class VideoAnnotator:
             self.current_points = []
             self.mode = AnnotationMode.SEEK
 
+    # ========================================================================
+    # Drawing functions
+    # ========================================================================
+
+    def draw_legend(self, image):
+        """
+        Draw the current annotation mode's legend on the image.
+        """
+        legend_text = LEGENDS.get(self.mode, "")
+        if self.mode == AnnotationMode.SEEK:
+            legend_text = legend_text.format(frame_number=self.current_frame_index)
+        elif self.mode in (AnnotationMode.EDIT_RECT, AnnotationMode.EDIT_ELLIPSE):
+            legend_text = legend_text.format(dpx=self.dpx)
+        lines = legend_text.split('\n')
+
+        y = 30  # Starting y position
+        for line in lines:
+            cv2.putText(image, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6, (73, 235, 52), 2)
+            y += 25
+        return image
+
 
     def draw_shapes(self, image):
         """
-        Draw all shapes on the image.
+        Draw all ROI shapes on the image.
         """
         overlay = image.copy()
 
@@ -393,8 +393,8 @@ class VideoAnnotator:
                 # Toggle help overlay
                 self.show_legend = not self.show_legend
                 continue
-            
-            
+
+
             # if key == 0x10:  # VK_SHIFT
             #     self.shift_pressed = True
             # elif key == 0x11:  # VK_CONTROL
@@ -534,11 +534,12 @@ class VideoAnnotator:
         u: undo last vertex
         """
         key_alpha = key & 0xFF
-        
+
         if key_alpha == 27:  # ESC
             self.mode = AnnotationMode.SEEK
             self.current_points = []
             self.current_hud_item = None
+
         elif key_alpha == ord('u') and self.current_points:
             # Remove last vertex
             self.current_points.pop()
@@ -555,37 +556,46 @@ class VideoAnnotator:
             self.current_hud_item = None
             return
 
+        elif key_alpha == ord('['):
+            self.dpx = max(1, self.dpx - 1)
+            return
+        elif key_alpha == ord(']'):
+            self.dpx = min(50, self.dpx + 1)
+            return
+
         # Get vertices and translate according to keypresses
         shape = self.hud_rois[self.current_hud_item]
         pt1, pt2 = shape['coords']
+        dpx = self.dpx
 
         # Get current modifier states
-        if key_alpha in WASD_KEYS:
+        # Get current modifier states
+        if key_alpha in WASD_LOWER_KEYS:
             # wasd: adjust top/left
             if key_alpha == WASD_UP:  # Up
-                pt1 = (pt1[0], pt1[1] - 1)
+                pt1 = (pt1[0], pt1[1] - dpx)
             elif key == WASD_DOWN:  # Down
-                pt1 = (pt1[0], pt1[1] + 1)
+                pt1 = (pt1[0], pt1[1] + dpx)
             elif key == WASD_LEFT:  # Left
-                pt1 = (pt1[0] - 1, pt1[1])
+                pt1 = (pt1[0] - dpx, pt1[1])
             elif key == WASD_RIGHT:  # Right
-                pt1 = (pt1[0] + 1, pt1[1])
-        
+                pt1 = (pt1[0] + dpx, pt1[1])
+
         elif key in WASD_CAPS_KEYS:
             # Ctrl+arrows: adjust bottom/right
             if key == WASD_CAPS_UP:  # Up
-                pt2 = (pt2[0], pt2[1] - 1)
+                pt2 = (pt2[0], pt2[1] - dpx)
             elif key == WASD_CAPS_DOWN:  # Down
-                pt2 = (pt2[0], pt2[1] + 1)
+                pt2 = (pt2[0], pt2[1] + dpx)
             elif key == WASD_CAPS_LEFT:  # Left
-                pt2 = (pt2[0] - 1, pt2[1])
+                pt2 = (pt2[0] - dpx, pt2[1])
             elif key == WASD_CAPS_RIGHT:  # Right
-                pt2 = (pt2[0] + 1, pt2[1])
+                pt2 = (pt2[0] + dpx, pt2[1])
 
         elif key in KEYBOARD_ARROW_KEYS:
             # No modifier: move entire rectangle
-            dx = 1 if key == ARROW_KEY_RIGHT else (-1 if key == ARROW_KEY_LEFT else 0)
-            dy = 1 if key == ARROW_KEY_DOWN else (-1 if key == ARROW_KEY_UP else 0)
+            dx = dpx if key == ARROW_KEY_RIGHT else (-dpx if key == ARROW_KEY_LEFT else 0)
+            dy = dpx if key == ARROW_KEY_DOWN else (-dpx if key == ARROW_KEY_UP else 0)
             pt1 = (pt1[0] + dx, pt1[1] + dy)
             pt2 = (pt2[0] + dx, pt2[1] + dy)
 
@@ -608,19 +618,27 @@ class VideoAnnotator:
             self.current_hud_item = None
             return
 
-        elif key in KEYBOARD_ARROW_KEYS + WASD_KEYS:
+        elif key_alpha == ord('['):
+            self.dpx = max(1, self.dpx - 1)
+            return
+        elif key_alpha == ord(']'):
+            self.dpx = min(50, self.dpx + 1)
+            return
+
+        elif key in KEYBOARD_ARROW_KEYS + WASD_LOWER_KEYS:
 
             shape = self.hud_rois[self.current_hud_item]
             center, axes, angle = shape['coords']
+            dpx = self.dpx
 
             if key in [WASD_DOWN, WASD_UP]:  # Up/Down
-                axes = (axes[0], axes[1] + (1 if key == WASD_UP else -1))
+                axes = (axes[0], axes[1] + (dpx if key == WASD_UP else -dpx))
             elif key in [WASD_LEFT, WASD_RIGHT]:  # Left/Right
-                axes = (axes[0] + (1 if key == WASD_RIGHT else -1), axes[1])
+                axes = (axes[0] + (dpx if key == WASD_RIGHT else -dpx), axes[1])
             else:
                 # No modifier: move center
-                dx = 1 if key == ARROW_KEY_RIGHT else (-1 if key == ARROW_KEY_LEFT else 0)
-                dy = 1 if key == ARROW_KEY_DOWN else (-1 if key == ARROW_KEY_UP else 0)
+                dx = dpx if key == ARROW_KEY_RIGHT else (-dpx if key == ARROW_KEY_LEFT else 0)
+                dy = dpx if key == ARROW_KEY_DOWN else (-dpx if key == ARROW_KEY_UP else 0)
                 center = (center[0] + dx, center[1] + dy)
 
             self.hud_rois[self.current_hud_item]['coords'] = (center, axes, angle)
