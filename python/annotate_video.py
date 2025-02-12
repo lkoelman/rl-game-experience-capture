@@ -52,6 +52,17 @@ ARROW_KEY_UP = 2490368
 ARROW_KEY_DOWN = 2621440
 KEYBOARD_ARROW_KEYS = ARROW_KEY_LEFT, ARROW_KEY_RIGHT, ARROW_KEY_DOWN, ARROW_KEY_UP
 
+WASD_UP = ord('w')
+WASD_DOWN = ord('s')
+WASD_LEFT = ord('a')
+WASD_RIGHT = ord('d')
+WASD_CAPS_UP = ord('W')
+WASD_CAPS_DOWN = ord('S')
+WASD_CAPS_LEFT = ord('A')
+WASD_CAPS_RIGHT = ord('D')
+WASD_KEYS = [ord(c) for c in 'wasd']
+WASD_CAPS_KEYS = [ord(c) for c in 'WASD']
+
 LEGENDS = {
     # Seek mode
     # - use can seek in the video/skip between frames
@@ -86,7 +97,7 @@ LEGENDS = {
     AnnotationMode.DRAW_RECT: textwrap.dedent(
         """\
         MODE: rectangle annotation
-        (Three points, counter-clockwise)
+        (two points)
         h: show help
         """
     ),
@@ -97,11 +108,10 @@ LEGENDS = {
         """\
         MODE: rectangle editing (Move corners)
         h: show help
+        esc: return
         UP/DOWN/L/R: move rect
-        SHIFT+U/D: move top border
-        CTRL+U/D: move bottom border
-        SHIFT+L/R: move left border
-        CTRL+L/R: move right border
+        wasd: move top/left border
+        WASD: move bottom/right border
         """
     ),
     AnnotationMode.DRAW_ELLIPSE: textwrap.dedent(
@@ -116,9 +126,9 @@ LEGENDS = {
         MODE: ellipse editing
         (edit center, rv, rh)
         h: show help
+        esc: return
         UP/DOWN/L/R: move
-        SHIFT+U/D: resize rv
-        SHIFT+L/R: resize rh
+        wasd: adjust radii
         """
     ),
     AnnotationMode.DRAW_POLY: textwrap.dedent(
@@ -126,6 +136,7 @@ LEGENDS = {
         MODE: polygon annotation
         (Draw vertices, counter-clockwise)
         h: show help
+        esc: return
         """
     )
 }
@@ -234,7 +245,7 @@ class VideoAnnotator:
         """
         Mouse callback for drawing polygons.
         """
-        # TODO: callbacks depending on the mode we are in
+        # TODO: daw partial polygon (connect back to first vertex)
 
         if event == cv2.EVENT_LBUTTONDOWN:
             # Left-click: add a point to the current polygon
@@ -250,6 +261,7 @@ class VideoAnnotator:
 
             # Reset the current polygon
             self.current_polygon = []
+            self.mode = AnnotationMode.SEEK
 
 
     def draw_shapes(self, image):
@@ -384,16 +396,16 @@ class VideoAnnotator:
                 # Toggle help overlay
                 self.show_legend = not self.show_legend
                 continue
-
-            # Track modifier keys
-            if key == 0x10:  # VK_SHIFT
-                self.shift_pressed = True
-            elif key == 0x11:  # VK_CONTROL
-                self.ctrl_pressed = True
-            elif key == -0x10:  # VK_SHIFT released
-                self.shift_pressed = False
-            elif key == -0x11:  # VK_CONTROL released
-                self.ctrl_pressed = False
+            
+            
+            # if key == 0x10:  # VK_SHIFT
+            #     self.shift_pressed = True
+            # elif key == 0x11:  # VK_CONTROL
+            #     self.ctrl_pressed = True
+            # elif key == -0x10:  # VK_SHIFT released
+            #     self.shift_pressed = False
+            # elif key == -0x11:  # VK_CONTROL released
+            #     self.ctrl_pressed = False
 
             # Handle keys based on current mode
             if self.mode == AnnotationMode.SEEK:
@@ -407,6 +419,9 @@ class VideoAnnotator:
                     self.mode = AnnotationMode.SEEK
                     self.current_points = []
                     self.current_hud_item = None
+
+            elif self.mode == AnnotationMode.DRAW_POLY:
+                self.mode_draw_poly_transitions(key, display_img)
 
             elif self.mode == AnnotationMode.EDIT_RECT:
                 self.mode_edit_rect_transitions(key, display_img)
@@ -490,8 +505,10 @@ class VideoAnnotator:
                 shape = self.hud_rois[self.current_hud_item]
                 if shape['type'] == 'rect':
                     self.target_mode = AnnotationMode.EDIT_RECT
+                    print(f"Entering mode: {AnnotationMode.EDIT_RECT.name}")
                 elif shape['type'] == 'ellipse':
                     self.target_mode = AnnotationMode.EDIT_ELLIPSE
+                    print(f"Entering mode: {AnnotationMode.EDIT_ELLIPSE.name}")
 
             elif self.target_mode == AnnotationMode.DELETE_ROI:
                 del self.hud_rois[self.current_hud_item]
@@ -507,57 +524,64 @@ class VideoAnnotator:
             pass
 
 
+    def mode_draw_poly_transitions(self, key: int, display_img: np.ndarray):
+        """
+        FSM transitions for DRAW_POLY mode.
+        """
+        # TODO: remove last vertex when 'u' is pressed
+        pass
+
+
     def mode_edit_rect_transitions(self, key: int, display_img: np.ndarray):
         """
         FSM transitions for EDIT_RECT mode.
         """
-        print(f"Entering mode: {AnnotationMode.EDIT_RECT.name}")
-
         key_alpha = key & 0xFF
 
         if key_alpha == 27:  # ESC
             self.mode = AnnotationMode.SEEK
             self.current_hud_item = None
+            return
+
+        # Get vertices and translate according to keypresses
+        shape = self.hud_rois[self.current_hud_item]
+        pt1, pt2 = shape['coords']
+
+        # Get current modifier states
+        if key_alpha in WASD_KEYS:
+            # wasd: adjust top/left
+            if key_alpha == WASD_UP:  # Up
+                pt1 = (pt1[0], pt1[1] - 1)
+            elif key == WASD_DOWN:  # Down
+                pt1 = (pt1[0], pt1[1] + 1)
+            elif key == WASD_LEFT:  # Left
+                pt1 = (pt1[0] - 1, pt1[1])
+            elif key == WASD_RIGHT:  # Right
+                pt1 = (pt1[0] + 1, pt1[1])
+        
+        elif key in WASD_CAPS_KEYS:
+            # Ctrl+arrows: adjust bottom/right
+            if key == WASD_CAPS_UP:  # Up
+                pt2 = (pt2[0], pt2[1] - 1)
+            elif key == WASD_CAPS_DOWN:  # Down
+                pt2 = (pt2[0], pt2[1] + 1)
+            elif key == WASD_CAPS_LEFT:  # Left
+                pt2 = (pt2[0] - 1, pt2[1])
+            elif key == WASD_CAPS_RIGHT:  # Right
+                pt2 = (pt2[0] + 1, pt2[1])
 
         elif key in KEYBOARD_ARROW_KEYS:
+            # No modifier: move entire rectangle
+            dx = 1 if key == ARROW_KEY_RIGHT else (-1 if key == ARROW_KEY_LEFT else 0)
+            dy = 1 if key == ARROW_KEY_DOWN else (-1 if key == ARROW_KEY_UP else 0)
+            pt1 = (pt1[0] + dx, pt1[1] + dy)
+            pt2 = (pt2[0] + dx, pt2[1] + dy)
 
-            # Get vertices and translate according to keypresses
-            shape = self.hud_rois[self.current_hud_item]
-            pt1, pt2 = shape['coords']
-
-            # Get current modifier states
-            if self.shift_pressed:
-                # Shift+arrows: adjust top/left
-                if key == ARROW_KEY_UP:  # Up
-                    pt1 = (pt1[0], pt1[1] - 1)
-                elif key == ARROW_KEY_DOWN:  # Down
-                    pt1 = (pt1[0], pt1[1] + 1)
-                elif key == ARROW_KEY_LEFT:  # Left
-                    pt1 = (pt1[0] - 1, pt1[1])
-                elif key == ARROW_KEY_RIGHT:  # Right
-                    pt1 = (pt1[0] + 1, pt1[1])
-            elif self.ctrl_pressed:
-                # Ctrl+arrows: adjust bottom/right
-                if key == ARROW_KEY_UP:  # Up
-                    pt2 = (pt2[0], pt2[1] - 1)
-                elif key == ARROW_KEY_DOWN:  # Down
-                    pt2 = (pt2[0], pt2[1] + 1)
-                elif key == ARROW_KEY_LEFT:  # Left
-                    pt2 = (pt2[0] - 1, pt2[1])
-                elif key == ARROW_KEY_RIGHT:  # Right
-                    pt2 = (pt2[0] + 1, pt2[1])
-            else:
-                # No modifier: move entire rectangle
-                dx = 1 if key == ARROW_KEY_RIGHT else (-1 if key == ARROW_KEY_LEFT else 0)
-                dy = 1 if key == ARROW_KEY_DOWN else (-1 if key == ARROW_KEY_UP else 0)
-                pt1 = (pt1[0] + dx, pt1[1] + dy)
-                pt2 = (pt2[0] + dx, pt2[1] + dy)
-
-            # Update two points that define rectangle
-            self.hud_rois[self.current_hud_item]['coords'] = (pt1, pt2)
-
-        elif key_alpha != 255:
+        elif key > 0:
             print(f"Unrecognized key: {key} for mode {self.mode.name}")
+
+        # Update two points that define rectangle
+        self.hud_rois[self.current_hud_item]['coords'] = (pt1, pt2)
 
     def mode_edit_ellipse_transitions(self, key: int, display_img: np.ndarray):
         """
@@ -570,19 +594,17 @@ class VideoAnnotator:
         if key_alpha == 27:  # ESC
             self.mode = AnnotationMode.SEEK
             self.current_hud_item = None
+            return
 
-        elif key in KEYBOARD_ARROW_KEYS:  # Arrow keys
+        elif key in KEYBOARD_ARROW_KEYS + WASD_KEYS:
 
             shape = self.hud_rois[self.current_hud_item]
             center, axes, angle = shape['coords']
 
-            # Get current modifier state
-            if self.shift_pressed:
-                # Shift+arrows: adjust radii
-                if key in [ARROW_KEY_DOWN, ARROW_KEY_UP]:  # Up/Down
-                    axes = (axes[0], axes[1] + (1 if key == ARROW_KEY_UP else -1))
-                else:  # Left/Right
-                    axes = (axes[0] + (1 if key == ARROW_KEY_RIGHT else -1), axes[1])
+            if key in [WASD_DOWN, WASD_UP]:  # Up/Down
+                axes = (axes[0], axes[1] + (1 if key == WASD_UP else -1))
+            elif key in [WASD_LEFT, WASD_RIGHT]:  # Left/Right
+                axes = (axes[0] + (1 if key == WASD_RIGHT else -1), axes[1])
             else:
                 # No modifier: move center
                 dx = 1 if key == ARROW_KEY_RIGHT else (-1 if key == ARROW_KEY_LEFT else 0)
