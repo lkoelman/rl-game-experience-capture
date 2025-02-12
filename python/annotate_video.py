@@ -26,6 +26,8 @@ class AnnotationMode(IntEnum):
 class PoeRoi(IntEnum):
     """
     Regions of interest for PoE2 UI.
+
+    Note that there is only one ROI of each type for the entire video.
     """
     HEALTH_GLOBE = 1
     ENERGY_SHIELD = 2
@@ -37,7 +39,13 @@ class PoeRoi(IntEnum):
 
 # TODO: Legend for each anotation mode
 LEGENDS = {
-    # TODO: show rectangle id (num) when i is pressed and select using integer
+    # Seek mode
+    # - use can seek in the video/skip between frames
+    # - enter different ROI drawing/editing modes
+    # - when (e) or (d) is pressed to edit or draw an ROI: 
+    #   first display their integer enum numbers in the center of each ROI,
+    #   and let user select with number keypress. Depending on the ROI that's
+    #   selected for editing, enter the corresponding ROI editing mode
     AnnotationMode.SEEK: textwrap.dedent(
         """\
         MODE: frame seeking
@@ -50,16 +58,17 @@ LEGENDS = {
         d: delete roi
         """
     ),
-    # TODO: convenient roi editing keybindings
-    # - arrows to move
-    # - shift-arrow to resize 
+    # Draw upper left vertex, bottom boundary, right boundary
     AnnotationMode.DRAW_RECT: textwrap.dedent(
         """\
         MODE: rectangle annotation
-        (Draw four corners, counter-clockwise)
+        (Three points, counter-clockwise)
         h: show help
         """
     ),
+    # TODO: convenient roi editing keybindings
+    # - arrows to move the ROI
+    # - shift-arrow to resize 
     AnnotationMode.EDIT_RECT: textwrap.dedent(
         """\
         MODE: rectangle editing (Move corners)
@@ -74,18 +83,18 @@ LEGENDS = {
     AnnotationMode.DRAW_ELLIPSE: textwrap.dedent(
         """\
         MODE: ellipse annotation
-        (Draw center, r1, r2)
+        (Draw center, radii rv and rh)
         h: show help
         """
     ),
     AnnotationMode.EDIT_ELLIPSE: textwrap.dedent(
         """\
         MODE: ellipse editing
-        (edit center, r1, r2)
+        (edit center, rv, rh)
         h: show help
         UP/DOWN/L/R: move
-        SHIFT+U/D: resize r1
-        SHIFT+L/R: resize r2
+        SHIFT+U/D: resize rv
+        SHIFT+L/R: resize rh
         """
     ),
     AnnotationMode.DRAW_POLY: textwrap.dedent(
@@ -105,35 +114,82 @@ class VideoAnnotator:
     """
 
     def __init__(self):
-        self.polygons_per_frame: dict[PoeRoi] = {}  # Dictionary: frame_index -> list of polygons (each is a list of (x, y) points)
-        self.current_polygon: PolygonCoords = []     # Points of the polygon currently being drawn
+        self.shapes: dict[PoeRoi, dict] = {}  # Dictionary: PoeRoi -> {type: str, coords: tuple}
+        self.current_points: PolygonCoords = []  # Points for the current shape being drawn
+        self.current_shape = None  # Currently selected shape for editing
+        self.current_mouse_pos = (0, 0)  # Current mouse position for preview
         self.current_frame_index = 0
-        self.current_roi: Optional[PoeRoi] = None
-
-        self.WINDOW_NAME = "Annotation Tool"
-
+        self.current_roi = None
         self.mode = AnnotationMode.SEEK
+        self.WINDOW_NAME = "Annotation Tool"
     
-
-    def draw_polygons(self, image, polygons, current_polygon=None):
+    
+    def draw_legend(self, image):
         """
-        Draw existing polygons and the current (in-progress) polygon on the image.
+        Draw the current annotation mode's legend on the image.
         """
-        overlay = image.copy()
-
-        # Draw finished polygons in green
-        for poly in polygons:
-            pts = np.array(poly, dtype=np.int32).reshape((-1, 1, 2))
-            cv2.polylines(overlay, [pts], isClosed=True, color=(0, 255, 0), thickness=2)
-
-        # Draw current in-progress polygon in blue
-        if current_polygon and len(current_polygon) > 1:
-            pts = np.array(current_polygon, dtype=np.int32).reshape((-1, 1, 2))
-            cv2.polylines(overlay, [pts], isClosed=False, color=(255, 0, 0), thickness=2)
-
-        return overlay
-
+        legend_text = LEGENDS.get(self.mode, "")
+        lines = legend_text.split('\n')
+        
+        y = 30  # Starting y position
+        for line in lines:
+            cv2.putText(image, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 
+                        0.6, (73, 235, 52), 2)
+            y += 25
+        return image
+    
     def mouse_callback(self, event, x, y, flags, param):
+        """
+        Main mouse callback that delegates to mode-specific handlers.
+        """
+        self.current_mouse_pos = (x, y)
+        
+        if self.mode == AnnotationMode.DRAW_RECT:
+            self.draw_rect_callback(event, x, y, flags, param)
+        elif self.mode == AnnotationMode.DRAW_ELLIPSE:
+            self.draw_ellipse_callback(event, x, y, flags, param)
+        elif self.mode == AnnotationMode.EDIT_RECT:
+            self.edit_rect_callback(event, x, y, flags, param)
+        elif self.mode == AnnotationMode.EDIT_ELLIPSE:
+            self.edit_ellipse_callback(event, x, y, flags, param)
+        elif self.mode == AnnotationMode.DRAW_POLY:
+            self.draw_polygon_callback(event, x, y, flags, param)
+
+
+    def draw_rect_callback(self, event, x, y, flags, param):
+        """Mouse callback for rectangle drawing mode."""
+        if event == cv2.EVENT_LBUTTONDOWN:
+            if not self.current_points:
+                self.current_points = [(x, y)]
+            else:
+                pt1 = self.current_points[0]
+                pt2 = (x, y)
+                if self.current_roi:
+                    self.shapes[self.current_roi] = {
+                        'type': 'rect',
+                        'coords': (pt1, pt2)
+                    }
+                self.current_points = []
+                self.mode = AnnotationMode.SEEK
+
+    def draw_ellipse_callback(self, event, x, y, flags, param):
+        """Mouse callback for ellipse drawing mode."""
+        if event == cv2.EVENT_LBUTTONDOWN:
+            if not self.current_points:
+                self.current_points = [(x, y)]  # Center point
+            else:
+                center = self.current_points[0]
+                axes = (abs(x - center[0]), abs(y - center[1]))
+                if self.current_roi:
+                    self.shapes[self.current_roi] = {
+                        'type': 'ellipse',
+                        'coords': (center, axes, 0)  # 0 is rotation angle
+                    }
+                self.current_points = []
+                self.mode = AnnotationMode.SEEK
+
+
+    def draw_polygon_callback(self, event, x, y, flags, param):
         """
         Mouse callback for drawing polygons.
         """
@@ -155,6 +211,48 @@ class VideoAnnotator:
             self.current_polygon = []
 
 
+    def draw_shapes(self, image):
+        """
+        Draw all shapes on the image.
+        """
+        overlay = image.copy()
+        
+        # Draw existing shapes
+        for roi_type, shape in self.shapes.items():
+            
+            if shape['type'] == 'rect':
+                pt1, pt2 = shape['coords']
+                cv2.rectangle(overlay, pt1, pt2, (0, 255, 0), 2)
+            
+            elif shape['type'] == 'ellipse':
+                center, axes, angle = shape['coords']
+                cv2.ellipse(overlay, center, axes, angle, 0, 360, (0, 255, 0), 2)
+            
+            elif shape['type'] == 'polygon':
+                pts = np.array(shape['coords'], dtype=np.int32).reshape((-1, 1, 2))
+                cv2.polylines(overlay, [pts], isClosed=True, color=(0, 255, 0), thickness=2)
+        
+        # Draw shape in progress
+        if self.current_shape:
+            
+            if self.mode == AnnotationMode.DRAW_RECT and len(self.current_points) >= 1:
+                pt1 = self.current_points[0]
+                pt2 = (self.current_mouse_pos[0], self.current_mouse_pos[1])
+                cv2.rectangle(overlay, pt1, pt2, (255, 0, 0), 2)
+            
+            elif self.mode == AnnotationMode.DRAW_ELLIPSE and len(self.current_points) >= 1:
+                center = self.current_points[0]
+                axes = (abs(self.current_mouse_pos[0] - center[0]),
+                    abs(self.current_mouse_pos[1] - center[1]))
+                cv2.ellipse(overlay, center, axes, 0, 0, 360, (255, 0, 0), 2)
+
+            elif self.mode == AnnotationMode.DRAW_POLY and len(self.current_points) >= 1:
+                pts = np.array(self.current_points, dtype=np.int32).reshape((-1, 1, 2))
+                cv2.polylines(overlay, [pts], isClosed=False, color=(255, 0, 0), thickness=2)
+        
+        return overlay
+
+
     def run(self, video_path: Path):
         """
         Video annotation main loop (blocking).
@@ -163,6 +261,7 @@ class VideoAnnotator:
         # 1. Open the video using `decord` (CPU context)
         with open(video_path, 'rb') as f:
             vr = VideoReader(f, ctx=cpu(0))
+        
         total_frames = len(vr)
         if total_frames == 0:
             print("No frames found in the video. Exiting.")
@@ -186,35 +285,48 @@ class VideoAnnotator:
             frame_nd = vr[self.current_frame_index]          # returns an NDArray in RGB
             frame_bgr = cv2.cvtColor(frame_nd.asnumpy(), cv2.COLOR_RGB2BGR)
 
-            # Retrieve existing polygons for this frame
-            existing_polygons = self.polygons_per_frame.get(self.current_frame_index, [])
-
-            # Draw polygons onto the image
-            display_img = self.draw_polygons(frame_bgr, existing_polygons, self.current_polygon)
-
-            # Display the frame
-            cv2.imshow(self.WINDOW_NAME, display_img)
-
-            # Handle keyboard input
-            key = cv2.waitKey(30)
-            key_alpha = key & 0xFF  # alphanumeric keys
+            # Draw shapes and legend
+            display_img = self.draw_shapes(frame_bgr)
+            display_img = self.draw_legend(display_img)
             
-            # TODO: add state machine to switch between drawing modes
+            cv2.imshow(self.WINDOW_NAME, display_img)
+            
+            key = cv2.waitKey(30)
+            key_alpha = key & 0xFF
+
+            # TODO: fix state machine for annotation modes
+
             if key_alpha == ord('q'):
                 break
+            elif key_alpha == ord('r'):
+                self.mode = AnnotationMode.DRAW_RECT
+                self.current_points = []
+            elif key_alpha == ord('c'):
+                self.mode = AnnotationMode.DRAW_ELLIPSE
+                self.current_points = []
+            elif key_alpha == ord('e'):
+                # Show ROI numbers and wait for selection
+                self.show_roi_numbers()
+                roi_key = cv2.waitKey(0) & 0xFF
+                try:
+                    self.current_roi = PoeRoi(int(chr(roi_key)))
+                    if self.current_roi in self.shapes:
+                        shape = self.shapes[self.current_roi]
+                        if shape['type'] == 'rect':
+                            self.mode = AnnotationMode.EDIT_RECT
+                        elif shape['type'] == 'ellipse':
+                            self.mode = AnnotationMode.EDIT_ELLIPSE
+                except ValueError:
+                    pass
             
             elif key_alpha == ord('k') or key == 81:
                 if self.current_frame_index > 0:
                     self.current_frame_index -= 1
-                    # Reset current polygon when switching frames
-                    self.current_polygon.clear()
                     print(f"Seek to frame {self.current_frame_index}")
             
             elif key_alpha == ord('j') or key == 83:
                 if self.current_frame_index < total_frames - 1:
                     self.current_frame_index += 1
-                    # Reset current polygon when switching frames
-                    self.current_polygon.clear()
                     print(f"Seek to frame {self.current_frame_index}")
             
             elif key_alpha != 255:
@@ -230,18 +342,12 @@ class VideoAnnotator:
             for i, poly in enumerate(polygons):
                 print(f"  Polygon {i}: {poly}")
 
+
 def main(video_path: Path):
     """
     Start video annotation tool.
 
-    TODO: improve the tool
-    - not polygons per frame, just one set
-    - set polygon labels (enum for required annotations)
-    - drawing modes: rectangle, polygon, circle, elipse?
-        - show legend per drawing mode (show/hide option)
-    - export in sensible format
-    - load existing polygons from QuPath ?
-    - automatic detection using SAM2
+    TODO: export in sensible format
     """
 
     if not video_path.is_file():
