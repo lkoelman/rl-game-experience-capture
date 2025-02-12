@@ -79,6 +79,7 @@ LEGENDS = {
         k: prev frame
         r: draw rect
         c: draw ellipse
+        p: draw polygon
         e: edit roi
         d: delete roi
         """
@@ -244,23 +245,20 @@ class VideoAnnotator:
     def mode_drawpoly_callback(self, event, x, y, flags, param):
         """
         Mouse callback for drawing polygons.
+        Left click: add vertex
+        Right click: complete polygon
         """
-        # TODO: daw partial polygon (connect back to first vertex)
-
         if event == cv2.EVENT_LBUTTONDOWN:
-            # Left-click: add a point to the current polygon
-            self.current_polygon.append((x, y))
-
-        elif event == cv2.EVENT_RBUTTONDOWN:
-            # Right-click: finalize (close) the current polygon
-            if len(self.current_polygon) > 2:
-                # Add the polygon to the list for the current frame
-                if self.current_frame_index not in self.polygons_per_frame:
-                    self.polygons_per_frame[self.current_frame_index] = []
-                self.polygons_per_frame[self.current_frame_index].append(self.current_polygon.copy())
-
-            # Reset the current polygon
-            self.current_polygon = []
+            self.current_points.append((x, y))
+        elif event == cv2.EVENT_RBUTTONDOWN and len(self.current_points) >= 3:
+            # Complete polygon with at least 3 vertices
+            if self.current_hud_item:
+                self.current_points.append((x, y))
+                self.hud_rois[self.current_hud_item] = {
+                    'type': 'polygon',
+                    'coords': self.current_points
+                }
+            self.current_points = []
             self.mode = AnnotationMode.SEEK
 
 
@@ -300,8 +298,9 @@ class VideoAnnotator:
                 cv2.ellipse(overlay, center, axes, 0, 0, 360, (255, 0, 0), 2)
 
             elif self.mode == AnnotationMode.DRAW_POLY and len(self.current_points) >= 1:
-                pts = np.array(self.current_points, dtype=np.int32).reshape((-1, 1, 2))
-                cv2.polylines(overlay, [pts], isClosed=False, color=(255, 0, 0), thickness=2)
+                verts = self.current_points + [self.current_mouse_pos]
+                pts = np.array(verts, dtype=np.int32).reshape((-1, 1, 2))
+                cv2.polylines(overlay, [pts], isClosed=True, color=(255, 0, 0), thickness=2)
 
         return overlay
 
@@ -365,8 +364,6 @@ class VideoAnnotator:
         cv2.namedWindow(self.WINDOW_NAME, cv2.WINDOW_NORMAL)
         cv2.setMouseCallback(self.WINDOW_NAME, self.mouse_callback)
 
-        print("Use left/right arrow keys to navigate frames. Right-click to finalize a polygon.")
-        print("Press 'q' to quit.")
 
         # 3. Main loop: show each frame on demand
         while True:
@@ -461,6 +458,12 @@ class VideoAnnotator:
             self.mode = AnnotationMode.ROI_SELECTION
             self.target_mode = AnnotationMode.DRAW_ELLIPSE
 
+        elif key_alpha == ord('p'):
+            # Enter polygon drawing mode - first select ROI
+            print("Select ROI type for polygon")
+            self.mode = AnnotationMode.ROI_SELECTION
+            self.target_mode = AnnotationMode.DRAW_POLY
+
         elif key_alpha == ord('e'):
             # Enter edit mode - select ROI to edit
             print("Selecting ROI number to edit ...")
@@ -527,9 +530,18 @@ class VideoAnnotator:
     def mode_draw_poly_transitions(self, key: int, display_img: np.ndarray):
         """
         FSM transitions for DRAW_POLY mode.
+        ESC: cancel polygon
+        u: undo last vertex
         """
-        # TODO: remove last vertex when 'u' is pressed
-        pass
+        key_alpha = key & 0xFF
+        
+        if key_alpha == 27:  # ESC
+            self.mode = AnnotationMode.SEEK
+            self.current_points = []
+            self.current_hud_item = None
+        elif key_alpha == ord('u') and self.current_points:
+            # Remove last vertex
+            self.current_points.pop()
 
 
     def mode_edit_rect_transitions(self, key: int, display_img: np.ndarray):
