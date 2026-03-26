@@ -1,0 +1,70 @@
+[project]
+name = "object-detection-mota"
+version = "0.1.0"
+description = "Object detection and MOTA Pipeline"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.3.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+]
+notebooks = [
+    "jupyterlab>=4.5.4",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+[build-system]
+requires = ["uv_build>=0.7.19,<0.8.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+
+[tool.ruff.lint]
+ignore = [
+    "E501", # Long line that exceeds maximum allowed length.
+    "F841", # Local variable referenced before assignment, this is annoying during development.
+    "F403", # unable to detect undefined names
+    "E722", # Do not use bare `except`
+    "F405", # may be undefined, or defined from star imports
+]
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402", "F401"]
+"**/{tests,docs,tools}/*" = ["E402"]
+"path/to/file.py" = ["E402"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "prek>=0.3.3",
+]
