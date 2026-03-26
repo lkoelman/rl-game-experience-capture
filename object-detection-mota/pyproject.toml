@@ -1,10 +1,15 @@
 [project]
-name = "object-detection-mota"
+name = "tomota"
 version = "0.1.0"
-description = "Object detection and MOTA Pipeline"
+description = "Object Detection and Multi-Object Tracking Pipeline"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "rfdetr>=1.6.1",
+    "supervision>=0.27.0.post2",
+    "torch>=2.11.0",
+    "torchvision>=0.26.0",
+]
 
 
 [project.optional-dependencies]
@@ -25,7 +30,7 @@ python_functions = ["test_*"]
 addopts = "-v --tb=short"
 
 [tool.coverage.run]
-source = ["src"]
+source = ["tomota"]
 branch = true
 
 [tool.coverage.report]
