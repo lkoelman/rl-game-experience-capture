@@ -6,24 +6,41 @@
 
 - [X] test gamepad recording
 
+
+
 - [ ] implement post-processing pipeline
+    - [X] ROI annotation
+        - annotation of regions: experience, health, mana, damage, stats
+            - see QuPath -> load GeoJson ROIs in Python
+    - [ ] ROI HUD state extraction
+        - design filters
+        - visualize results based on filters
+    - [ ] episode done detection
+
     - data schema:
         - RLlib: see experience schema: https://docs.ray.io/en/latest/rllib/rllib-offline.html#using-external-expert-experiences and [SingleAgentEpisode](https://docs.ray.io/en/latest/rllib/package_ref/env/env/ray.rllib.env.single_agent_episode.SingleAgentEpisode.html#ray.rllib.env.single_agent_episode.SingleAgentEpisode)
+            - easiest might be to construct `SingleAgentEpisode` following example on docs page and then serialize using built-in method?
+            - or use the tabular format that conforms to the schema
         - Farama::Minari: https://minari.farama.org/content/dataset_standards/
         - [TorchRL.data](https://pytorch.org/rl/main/reference/data.html)
-    - annotation of regions: experience, health, mana, damage, stats
-        - see QuPath -> load GeoJson ROIs in Python
-    - episode done detection
+            - very well documented and good example in [DINO-WM repo](https://github.com/gaoyuezhou/dino_wm/blob/main/datasets/traj_dset.py)
+
     - temporal and spatial downsampling
     - encode using pretrained autoencoder
 
-- [ ] update `exp2transitions` script
-    - parse both gamepad and video frames simultaneously
-    - see RLLib experience format: https://docs.ray.io/en/latest/rllib/rllib-offline.html#using-external-expert-experiences
-        - easiest might be to construct `SingleAgentEpisode` following [example](https://docs.ray.io/en/latest/rllib/package_ref/env/env/ray.rllib.env.single_agent_episode.SingleAgentEpisode.html#ray.rllib.env.single_agent_episode.SingleAgentEpisode) and then serialize using built-in method?
-        - or use the tabular format that conforms to the scehma
-    - group sets of gamepad inputs together into (S,A,R,S) tuples
-        - identify good replay buffer framework
+    - [ ] update `exp2transitions` script
+        - parse both gamepad and video frames simultaneously
+        - see RLLib experience format: https://docs.ray.io/en/latest/rllib/rllib-offline.html#using-external-expert-experiences
+            - easiest might be to construct `SingleAgentEpisode` following [example](https://docs.ray.io/en/latest/rllib/package_ref/env/env/ray.rllib.env.single_agent_episode.SingleAgentEpisode.html#ray.rllib.env.single_agent_episode.SingleAgentEpisode) and then serialize using built-in method?
+
+        - group sets of gamepad inputs together into (S,A,R,S) tuples
+            - identify good replay buffer framework
+
+- [ ] real-time inference
+    - see notes below
+    - preferably not using deepstream: see open tabs on iphone/ipad (Paulbridger posts, frame buffer extraction)
+    - idea: gstream `dx12` elements: screencapture, videoconvert, followed by use of `cudaImportExternalMemory` call to convert to torch array on GPU?
+        - HOWEVER: don't overoptimize, try with gstreamer pipeline that converts to system memory first
 
 - [ ] implement game metadata file
     - gamepad -> action mapping
@@ -253,8 +270,9 @@ Below is a suggested high-level approach for designing an image processing pipel
     Output / Integration
         Emit these extracted states to your main application logic, or store them in a database or file (CSV, JSON) for further analysis.
 
-2. Detailed Steps & Techniques
-2.1 Video Input and Frame Extraction
+## 2. Detailed Steps & Techniques
+
+### 2.1 Video Input and Frame Extraction
 
     OpenCV provides cv::VideoCapture for reading frames from a variety of file formats. Under the hood, OpenCV uses FFmpeg in most builds, so you get robust format support automatically.
     FFmpeg as a direct library gives you more control (like reading raw frames, handling custom codecs), but it’s more complex to use than OpenCV’s built-in capabilities.
@@ -283,7 +301,7 @@ int main() {
 }
 ```
 
-2.2 Region of Interest Extraction & Preprocessing
+### 2.2 Region of Interest Extraction & Preprocessing
 
     If certain HUD elements are always in a known screen region (e.g., top-left corner for health), you can crop to that region using cv::Rect.
     If color is important (e.g., health bar is always bright green), perform color thresholding in an HSV color space to isolate that color range.
@@ -313,7 +331,7 @@ cv::erode(mask, cleanMask, cv::Mat());
 cv::dilate(cleanMask, cleanMask, cv::Mat());
 ```
 
-2.3 UI Element Detection
+### 2.3 UI Element Detection
 2.3.1 Bars (Health, Shield, XP)
 
     Fixed Position Bars
@@ -344,7 +362,7 @@ cv::dilate(cleanMask, cleanMask, cv::Mat());
         Detect text regions using OpenCV’s DNN text detection or a library like Tesseract.
         Recognize text and look for known keywords to confirm you’re in a specific menu.
 
-2.4 Extracting Numeric Data & Interpreting Game State
+### 2.4 Extracting Numeric Data & Interpreting Game State
 
     Bar Fill Percentage → Numeric Value
         For a horizontal bar: fillPercentage = (float)countOfFilledPixels / totalPixels;
@@ -355,12 +373,12 @@ cv::dilate(cleanMask, cleanMask, cv::Mat());
     State Flags
         For each frame (or interval of frames), set flags like bool isDead, bool isMenuOpen, etc. based on template matching or object detection results.
 
-2.5 Aggregation and Temporal Filtering
+### 2.5 Aggregation and Temporal Filtering
 
     If working with 60 FPS video, you might not need to analyze every single frame. You can sample at a lower rate (e.g., every 5 or 10 frames) for performance.
     Smooth out flickers with a short temporal filter: e.g., if isDead is detected in 10 consecutive frames, confirm the player is truly dead.
 
-3. Recommended C++ Libraries and Tools
+## 3. Recommended C++ Libraries and Tools
 
     OpenCV
         The go-to library for image processing, containing routines for filtering, morphological ops, color conversions, template matching, contour detection, etc.
@@ -388,7 +406,7 @@ cv::dilate(cleanMask, cleanMask, cv::Mat());
         If you need a more industrial-grade pipeline for reading/writing/manipulating video streams in real-time.
         Generally used in streaming or complex media processing scenarios.
 
-4. Example Pseudocode Putting It All Together
+## 4. Putting It All Together: Pseudocode
 
 ```cpp
 #include <opencv2/opencv.hpp>
@@ -415,7 +433,7 @@ int main(int argc, char** argv) {
         if(!cap.read(frame)) break;  // end of video
 
         frameCount++;
-        
+
         // Optional: skip frames for performance
         if(frameCount % 5 != 0) continue;
 
@@ -470,18 +488,18 @@ int main(int argc, char** argv) {
 }
 ```
 
-5. Summary
+## 5. Summary
 
-    Frame-by-frame processing is usually sufficient; sample fewer frames if real-time performance is not needed.
-    Fixed-position, color-coded bars are straightforward to detect with color thresholding and pixel counting.
-    Popups and menu screens can be tackled with template matching or object detection if variability is high.
-    Text-based UI elements require OCR (e.g., Tesseract) after appropriate preprocessing.
-    OpenCV is the primary go-to for C++-based image processing. Combine it with Tesseract for OCR, and optionally an object detection framework (YOLO, etc.) for more robust/complex detections.
+Frame-by-frame processing is usually sufficient; sample fewer frames if real-time performance is not needed.
+Fixed-position, color-coded bars are straightforward to detect with color thresholding and pixel counting.
+Popups and menu screens can be tackled with template matching or object detection if variability is high.
+Text-based UI elements require OCR (e.g., Tesseract) after appropriate preprocessing.
+OpenCV is the primary go-to for C++-based image processing. Combine it with Tesseract for OCR, and optionally an object detection framework (YOLO, etc.) for more robust/complex detections.
 
 With this pipeline, you will be able to extract health, shield, and XP values, detect death screens or pop-ups, and interpret various states of the game’s UI. Adjust details (like threshold ranges, bounding box coordinates, model training) depending on the specifics of your game’s interface and visual design.
 
 
-### Realtime Considerations
+## Realtime Considerations
 
 Assume that I want to do the same in realtime from a live screencapture. What modifications would you make to capture the screen and process the video in realtime?
 Reasoned about real-time game state extraction for a couple of seconds
@@ -520,7 +538,7 @@ When transitioning from offline video analysis (i.e., reading from a file) to re
 
 cv::Mat captureScreen(const RECT& region) {
     // 1. Get the device context of the screen
-    HDC hScreenDC = GetDC(nullptr); 
+    HDC hScreenDC = GetDC(nullptr);
     HDC hMemoryDC = CreateCompatibleDC(hScreenDC);
 
     int width = region.right - region.left;
@@ -531,7 +549,7 @@ cv::Mat captureScreen(const RECT& region) {
     SelectObject(hMemoryDC, hBitmap);
 
     // 3. BitBlt from screen DC to memory DC
-    BitBlt(hMemoryDC, 0, 0, width, height, 
+    BitBlt(hMemoryDC, 0, 0, width, height,
            hScreenDC, region.left, region.top, SRCCOPY);
 
     // 4. Create OpenCV Mat from HBITMAP
@@ -697,12 +715,14 @@ To adapt your offline video analysis pipeline to real-time screen capture:
 
 These modifications should allow you to capture game state (health, shield, XP bars, death screens, menus) from a live screen in real time.
 
-### Alternate Approach : CNN Regression
+## Alternate Approach : CNN Regression
 
 Once we have an annotated dataset, we could use a CNN/ViT with a regression head to predict the values and states in a more robust
 and computationally efficient manner.
 
-# Polygon ROI Extraction using PIL
+# Polygon ROI Extraction
+
+## Using PIL
 
 You are a software engineer. Please write a function that takes, given a list of 2d coordinates representing the vertices fo a polygon in image space, retrieves the pixels bounded by the polygon. Please suggested suitable python libraries such as numpy or PIL/pillow.
 
@@ -731,54 +751,54 @@ import numpy as np
 
 def get_polygon_pixels(image_path, polygon):
     """
-    Given a list of 2D coordinates (`polygon`) representing the vertices of 
-    a polygon in the coordinate space of `image_path`, 
+    Given a list of 2D coordinates (`polygon`) representing the vertices of
+    a polygon in the coordinate space of `image_path`,
     this function returns:
       1) the (row, col) coordinates of all pixels inside the polygon
       2) the corresponding pixel values from the image.
 
     Args:
         image_path (str): Path to the image.
-        polygon (list of tuples): A list of (x, y) vertex coordinates 
+        polygon (list of tuples): A list of (x, y) vertex coordinates
                                   defining the polygon in image space.
     Returns:
         coords (ndarray): An Nx2 array of (row, col) integer coordinates.
         polygon_pixels (ndarray): The pixel values at those coordinates.
     """
-    
+
     # 1. Load the image with PIL
     image = Image.open(image_path).convert("RGB")
     width, height = image.size
-    
+
     # 2. Create a blank (grayscale) mask and get a drawing context
     #    We'll fill the polygon region with 1 (white) on this mask.
     mask = Image.new('L', (width, height), 0)
     draw = ImageDraw.Draw(mask)
-    
+
     # 3. Draw the polygon on the mask
     #    Note: PIL expects a sequence of (x, y) pairs.
     #    outline=1, fill=1 ensures the polygon interior is labeled as 1.
     draw.polygon(polygon, outline=1, fill=1)
-    
+
     # 4. Convert the mask and the original image to NumPy arrays
     mask_np = np.array(mask)           # shape: (height, width)
     image_np = np.array(image)         # shape: (height, width, channels)
-    
+
     # 5. Find where the mask is 1
     #    This returns a 2D array of coordinates [ [row1, col1], [row2, col2], ... ]
     coords = np.argwhere(mask_np == 1)
-    
+
     # 6. Retrieve pixel values at these coordinates
     #    coords[:, 0] -> rows, coords[:, 1] -> cols
     polygon_pixels = image_np[coords[:, 0], coords[:, 1]]
-    
+
     return coords, polygon_pixels
 
 # Example usage:
 # Suppose you have an image "example.jpg" and a polygon defined by some vertices:
 # polygon_vertices = [(10, 10), (200, 50), (180, 180), (20, 150)]
 # coords, pixels = get_polygon_pixels("example.jpg", polygon_vertices)
-# 
+#
 # coords will be an array of shape (N, 2) with the (row, col) of each pixel.
 # pixels will be an array of shape (N, 3) with the corresponding RGB values.
 ```
@@ -819,16 +839,18 @@ Using Pillow and NumPy typically suffices for the basic task of extracting pixel
 ## Torch Models in C++
 
 See https://www.reddit.com/r/pytorch/comments/xb5pxh/best_way_to_use_pytorch_model_in_a_c_application/
-- If you trace and script your model in python, you can directly run it in C++ via torch::jit::load(). Another way is to export it to ONNX and then load it in C++ via ONNX's C API. 
+- If you trace and script your model in python, you can directly run it in C++ via torch::jit::load(). Another way is to export it to ONNX and then load it in C++ via ONNX's C API.
     - this approach is documented in https://pytorch.org/tutorials/advanced/cpp_export.html
-- If you don’t care about inference speed, then libtorch is the easiest way. If inference latency is the highest priority then do pytorch -> onnx -> tensorrt. Or using onnx runtime might also be a good middle ground. 
+- If you don’t care about inference speed, then libtorch is the easiest way. If inference latency is the highest priority then do pytorch -> onnx -> tensorrt. Or using onnx runtime might also be a good middle ground.
 
 
 ## Zero-copy Gstreamer to Tensor (Python)
 
 * [A Simple and Flexible Pytorch Video Pipeline \| paulbridger.com](https://paulbridger.com/posts/video-analytics-pytorch-pipeline/ "A Simple and Flexible Pytorch Video Pipeline | paulbridger.com")
-* [Getting the pointer to CUDAMemory of a buffer - General Discussion - GStreamer Discourse](https://discourse.gstreamer.org/t/getting-the-pointer-to-cudamemory-of-a-buffer/600 "Getting the pointer to CUDAMemory of a buffer - General Discussion - GStreamer Discourse")
-* [Gstreamer NVMM memory buffer to torch tensor with zero copy - Intelligent Video Analytics / DeepStream SDK - NVIDIA Developer Forums](https://forums.developer.nvidia.com/t/gstreamer-nvmm-memory-buffer-to-torch-tensor-with-zero-copy/295501 "Gstreamer NVMM memory buffer to torch tensor with zero copy - Intelligent Video Analytics / DeepStream SDK - NVIDIA Developer Forums")
+* [Getting the pointer to CUDAMemory of a buffer](https://discourse.gstreamer.org/t/getting-the-pointer-to-cudamemory-of-a-buffer/600)
+* [Gstreamer NVMM memory buffer to torch tensor with zero copy](https://forums.developer.nvidia.com/t/gstreamer-nvmm-memory-buffer-to-torch-tensor-with-zero-copy/295501)
+- `cudaImportExternalMemory` example: https://forums.developer.nvidia.com/t/cuda-interop-with-d3d12-possible/54671/4
+    - could expose this function to python using ctypes: https://vitalitylearning.medium.com/using-c-c-and-cuda-functions-as-regular-python-functions-716f01f7ca22
 * [deepstream_python_apps/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py at master · NVIDIA\-AI\-IOT\/deepstream\_python\_apps](https://github.com/NVIDIA-AI-IOT/deepstream_python_apps/blob/master/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py#L121 "deepstream_python_apps/apps/deepstream-imagedata-multistream/deepstream_imagedata-multistream.py at master · NVIDIA-AI-IOT/deepstream_python_apps")
 
 
