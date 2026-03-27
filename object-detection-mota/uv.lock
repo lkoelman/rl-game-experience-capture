@@ -2734,6 +2734,7 @@ name = "tomota"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "opencv-python" },
     { name = "rfdetr" },
     { name = "supervision" },
     { name = "torch" },
@@ -2761,6 +2762,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "jupyterlab", marker = "extra == 'notebooks'", specifier = ">=4.5.4" },
+    { name = "opencv-python", specifier = ">=4.13.0.92" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "rfdetr", specifier = ">=1.6.1" },
