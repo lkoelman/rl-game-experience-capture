@@ -26,7 +26,7 @@ core_lib = static_library(
   ],
   generated_protos,
   include_directories : inc_dir,
-  dependencies : [gst_dep, gst_app_dep, sdl3_dep, protobuf_dep, opencv_dep],
+  dependencies : [gst_dep, gst_app_dep, sdl3_dep, protobuf_dep],
 )
 
 executable(
