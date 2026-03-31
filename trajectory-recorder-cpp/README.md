@@ -36,11 +36,19 @@ Prerequisites on Windows:
 - `protoc` available on `PATH`
 - GStreamer development/runtime packages installed
 
-If GStreamer is installed at `C:\gstreamer\1.0\msvc_x86_64`, the build helper will use that installation automatically by exporting:
+The build helper links GStreamer directly from an existing Windows installation root instead of relying on pkg-config-derived linker flags for the GStreamer libraries.
+
+If GStreamer is installed at `C:\Program Files\gstreamer\1.0\msvc_x86_64`, pass that root explicitly:
+
+```powershell
+./scripts/build.ps1 -GStreamerRoot 'C:\Program Files\gstreamer\1.0\msvc_x86_64'
+```
+
+The helper exports:
 
 - `GSTREAMER_1_0_ROOT_X86_64`
-- `PATH += C:\gstreamer\1.0\msvc_x86_64\bin`
-- `PKG_CONFIG_PATH += C:\gstreamer\1.0\msvc_x86_64\lib\pkgconfig`
+- `PATH += <GStreamerRoot>\bin`
+- `PKG_CONFIG_PATH += <GStreamerRoot>\lib\pkgconfig`
 
 If GStreamer is installed somewhere else, pass the root explicitly:
 

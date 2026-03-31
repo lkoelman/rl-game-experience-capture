@@ -54,6 +54,12 @@ $mesonPkgConfigValue = "pkg_config_path = [" + (($mesonPkgConfigPaths | ForEach-
 $mesonNative = Get-Content $mesonNativeFile
 $mesonNative = $mesonNative -replace "^pkg_config_path = .*$", $mesonPkgConfigValue
 $mesonNative = $mesonNative -replace "^cpp_std = .*$", "cpp_std = 'c++20'"
+$gstreamerRootValue = "gstreamer_root = '" + ($gstreamerRootShort -replace '\\', '/') + "'"
+$propertiesIndex = [Array]::IndexOf($mesonNative, '[properties]')
+if ($propertiesIndex -ge 0) {
+    $insertIndex = $propertiesIndex + 1
+    $mesonNative = @($mesonNative[0..$propertiesIndex] + $gstreamerRootValue + $mesonNative[$insertIndex..($mesonNative.Length - 1)])
+}
 $mesonNative | Set-Content $mesonNativeFile
 
 $buildScript = "set ""GSTREAMER_1_0_ROOT_X86_64=$gstreamerRootShort"" && " +
