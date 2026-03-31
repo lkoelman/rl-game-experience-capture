@@ -7,7 +7,6 @@ project(
 
 protobuf_dep = dependency('protobuf')
 sdl3_dep = dependency('sdl')
-opencv_dep = dependency('opencv4')
 gst_dep = dependency('gstreamer-1.0')
 gst_app_dep = dependency('gstreamer-app-1.0')
 

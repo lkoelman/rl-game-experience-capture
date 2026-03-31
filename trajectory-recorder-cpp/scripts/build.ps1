@@ -7,12 +7,10 @@ $ErrorActionPreference = "Stop"
 
 conan install . --output-folder=$BuildDir --build=missing
 
-$buildScript = @"
-call "$BuildDir\conanbuild.bat" &&
-meson setup "$BuildDir" --buildtype $BuildType --native-file "$BuildDir\conan_meson_native.ini" --reconfigure &&
-meson compile -C "$BuildDir" &&
-meson test -C "$BuildDir" --print-errorlogs
-"@
+$buildScript = "call ""$BuildDir\conanbuild.bat"" && " +
+    "meson setup ""$BuildDir"" --buildtype $BuildType --native-file ""$BuildDir\conan_meson_native.ini"" --reconfigure && " +
+    "meson compile -C ""$BuildDir"" && " +
+    "meson test -C ""$BuildDir"" --print-errorlogs"
 
 cmd /c $buildScript
 if ($LASTEXITCODE -ne 0) {
