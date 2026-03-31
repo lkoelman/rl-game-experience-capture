@@ -25,6 +25,7 @@ C++20 scaffold for recording synchronized gameplay trajectories as video frames 
 
 - Install Conan from https://conan.io/downloads
 - Install Meson: https://mesonbuild.com/SimpleStart.html#windows1
+- Install GStreamer 1.X runtime and development files from https://gstreamer.freedesktop.org/download/#windows
 
 ## Build
 
@@ -33,7 +34,6 @@ Prerequisites on Windows:
 - Conan available on `PATH`
 - Meson and Ninja available on `PATH`
 - A working C++20 compiler toolchain
-- `protoc` available on `PATH`
 - GStreamer development/runtime packages installed
 
 The build helper links GStreamer directly from an existing Windows installation root instead of relying on pkg-config-derived linker flags for the GStreamer libraries.
@@ -63,6 +63,8 @@ Then run:
 ```powershell
 ./scripts/build.ps1
 ```
+
+The helper rebuilds Conan-managed dependencies to match the active MSVC runtime, build type, and C++20 setting when needed, and it uses the Conan-provided `protoc`.
 
 ## Clean Build Files
 

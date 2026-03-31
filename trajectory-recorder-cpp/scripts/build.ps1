@@ -32,7 +32,20 @@ if ($env:PKG_CONFIG_PATH) {
 }
 $pkgConfigPath = $pkgConfigPaths -join ';'
 
-conan install . --output-folder=$BuildDir --build=missing
+$conanBuildType = switch ($BuildType.ToLowerInvariant()) {
+    "debug" { "Debug" }
+    "release" { "Release" }
+    default { throw "Unsupported build type for Conan settings: $BuildType" }
+}
+
+conan install . `
+    --output-folder=$BuildDir `
+    --build=missing `
+    --build=protobuf/* `
+    -s compiler.cppstd=20 `
+    -s build_type=$conanBuildType `
+    -s compiler.runtime=dynamic `
+    -s compiler.runtime_type=$conanBuildType
 
 $protobufPc = Join-Path $BuildDir "protobuf.pc"
 $protobufPrefixLine = Select-String -Path $protobufPc -Pattern "^prefix="
