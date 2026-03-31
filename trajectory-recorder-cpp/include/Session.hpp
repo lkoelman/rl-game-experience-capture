@@ -3,15 +3,16 @@
 #include <memory>
 #include <string>
 
-#include "InputLogger.hpp"
-#include "SyncLogger.hpp"
-#include "VideoRecorder.hpp"
-
 namespace trajectory {
+
+class InputLogger;
+class SyncLogger;
+class VideoRecorder;
 
 class Session {
 public:
     Session(const std::string& output_dir, const std::string& session_name);
+    ~Session();
     void Start();
     void Stop();
 
@@ -22,4 +23,3 @@ private:
 };
 
 }  // namespace trajectory
-

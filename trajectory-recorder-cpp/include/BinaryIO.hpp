@@ -51,7 +51,9 @@ inline void WriteLengthPrefixedPayload(std::ostream& out, const std::string& pay
 inline std::string ReadLengthPrefixedPayload(std::istream& in) {
     const auto length = ReadUint32LittleEndian(in);
     std::string payload(length, '\0');
-    in.read(payload.data(), static_cast<std::streamsize>(payload.size()));
+    if (!payload.empty()) {
+        in.read(&payload[0], static_cast<std::streamsize>(payload.size()));
+    }
     if (in.gcount() != static_cast<std::streamsize>(payload.size())) {
         throw std::runtime_error("unexpected end of stream while reading payload");
     }
@@ -59,4 +61,3 @@ inline std::string ReadLengthPrefixedPayload(std::istream& in) {
 }
 
 }  // namespace trajectory
-

@@ -12,7 +12,7 @@ gst_app_dep = dependency('gstreamer-app-1.0')
 
 subdir('protos')
 
-inc_dir = include_directories('include', meson.current_build_dir())
+inc_dir = include_directories('include', '.', 'protos')
 
 core_lib = static_library(
   'recorder_core',

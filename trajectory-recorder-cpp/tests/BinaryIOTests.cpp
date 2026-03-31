@@ -27,7 +27,8 @@ void TestLengthPrefixedRoundTrip() {
 }
 
 void TestShortReadThrows() {
-    std::stringstream stream(std::string("\x05\x00\x00\x00abc", 7));
+    const std::string truncated_payload{char(0x05), char(0x00), char(0x00), char(0x00), 'a', 'b', 'c'};
+    std::stringstream stream(truncated_payload);
     bool threw = false;
     try {
         static_cast<void>(trajectory::ReadLengthPrefixedPayload(stream));
@@ -45,4 +46,3 @@ int main() {
     TestShortReadThrows();
     return 0;
 }
-

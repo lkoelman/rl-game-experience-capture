@@ -34,7 +34,19 @@ Prerequisites on Windows:
 - Meson and Ninja available on `PATH`
 - A working C++20 compiler toolchain
 - `protoc` available on `PATH`
-- GStreamer development/runtime packages installed and discoverable by Meson
+- GStreamer development/runtime packages installed
+
+If GStreamer is installed at `C:\gstreamer\1.0\msvc_x86_64`, the build helper will use that installation automatically by exporting:
+
+- `GSTREAMER_1_0_ROOT_X86_64`
+- `PATH += C:\gstreamer\1.0\msvc_x86_64\bin`
+- `PKG_CONFIG_PATH += C:\gstreamer\1.0\msvc_x86_64\lib\pkgconfig`
+
+If GStreamer is installed somewhere else, pass the root explicitly:
+
+```powershell
+./scripts/build.ps1 -GStreamerRoot D:\path\to\gstreamer\1.0\msvc_x86_64
+```
 
 Open a Developer Powershell for VS 20XX (shell with compiler toolchain installed)
 

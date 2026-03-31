@@ -2,6 +2,10 @@
 
 #include <filesystem>
 
+#include "InputLogger.hpp"
+#include "SyncLogger.hpp"
+#include "VideoRecorder.hpp"
+
 namespace trajectory {
 
 namespace {
@@ -21,6 +25,8 @@ Session::Session(const std::string& output_dir, const std::string& session_name)
     input_logger_ = std::make_unique<InputLogger>((session_dir / "actions.bin").string());
 }
 
+Session::~Session() = default;
+
 void Session::Start() {
     input_logger_->Start();
     video_recorder_->Start();
@@ -32,4 +38,3 @@ void Session::Stop() {
 }
 
 }  // namespace trajectory
-
