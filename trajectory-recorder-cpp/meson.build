@@ -6,7 +6,7 @@ project(
 )
 
 protobuf_dep = dependency('protobuf')
-sdl3_dep = dependency('sdl3')
+sdl3_dep = dependency('sdl')
 opencv_dep = dependency('opencv4')
 gst_dep = dependency('gstreamer-1.0')
 gst_app_dep = dependency('gstreamer-app-1.0')
@@ -22,7 +22,7 @@ core_lib = static_library(
     'src/VideoRecorder.cpp',
     'src/InputLogger.cpp',
     'src/SyncLogger.cpp',
-    'src/Replayer.cpp',
+    # 'src/Replayer.cpp',  # required for convert_dataset, requires OpenCV
   ],
   generated_protos,
   include_directories : inc_dir,
@@ -37,13 +37,14 @@ executable(
   dependencies : [gst_dep, gst_app_dep, sdl3_dep, protobuf_dep],
 )
 
-executable(
-  'convert_dataset',
-  'src/main_convert.cpp',
-  include_directories : inc_dir,
-  link_with : core_lib,
-  dependencies : [opencv_dep, protobuf_dep],
-)
+# Requires OpenCV
+# executable(
+#   'convert_dataset',
+#   'src/main_convert.cpp',
+#   include_directories : inc_dir,
+#   link_with : core_lib,
+#   dependencies : [opencv_dep, protobuf_dep],
+# )
 
 test_inc_dir = include_directories('include')
 test(
@@ -54,4 +55,3 @@ test(
     include_directories : test_inc_dir,
   ),
 )
-

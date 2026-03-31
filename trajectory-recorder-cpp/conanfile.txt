@@ -1,9 +1,13 @@
 [requires]
 protobuf/3.21.12
-opencv/4.8.1
 sdl/3.4.0
+# OpenCV required for convert_dataset only
+# opencv/4.8.1
+
+[tool_requires]
+pkgconf/2.5.1
 
 [generators]
 PkgConfigDeps
 MesonToolchain
-
+VirtualBuildEnv
