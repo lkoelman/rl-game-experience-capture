@@ -44,6 +44,28 @@ Then run:
 ./scripts/build.ps1
 ```
 
+## Clean Build Files
+
+To remove the default build output directory created by the helper script:
+
+```powershell
+Remove-Item -Recurse -Force builddir
+```
+
+To remove Conan-generated temporary and build files created by `conan install`, delete the generated files from the build directory:
+
+```powershell
+Remove-Item -Recurse -Force builddir
+```
+
+If you want to clear Conan's local cache artifacts as well, use:
+
+```powershell
+conan remove "*" --confirm
+```
+
+This removes all cached Conan packages and metadata from your local Conan cache, so the next build will resolve and rebuild dependencies from scratch.
+
 ## Executables
 
 - `record_session [output_dir] [session_name]`
