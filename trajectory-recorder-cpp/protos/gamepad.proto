@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package trajectory;
+
+message GamepadState {
+  uint64 monotonic_ns = 1;
+  repeated float axes = 2;
+  repeated uint32 pressed_buttons = 3;
+  repeated uint32 pressed_keys = 4;
+}
+

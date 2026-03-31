@@ -1,0 +1,9 @@
+[requires]
+protobuf/3.21.12
+opencv/4.8.1
+sdl/3.4.0
+
+[generators]
+PkgConfigDeps
+MesonToolchain
+
