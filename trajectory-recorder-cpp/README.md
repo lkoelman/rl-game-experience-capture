@@ -111,6 +111,7 @@ This removes all cached Conan packages and metadata from your local Conan cache,
 After building, run the executables:
 
 - `record_session [output_dir] [session_name]`
+- `validate_recording <session_dir|sessions_root>`
 - `convert_dataset <capture.mp4> <sync.csv> <actions.bin>`
 
 `record_session` now supports pre-recording capture selection:
@@ -147,3 +148,21 @@ If you want to rebuild and then run in the same shell:
 $env:PATH = "C:\Program Files\gstreamer\1.0\msvc_x86_64\bin;$env:PATH"
 .\builddir\record_session.exe .\data test_session
 ```
+
+`validate_recording` validates one recorded session or scans a directory containing multiple session folders.
+
+Examples:
+
+```powershell
+.\builddir\validate_recording.exe .\data\test_session
+.\builddir\validate_recording.exe .\data --json
+.\builddir\validate_recording.exe .\data --csv
+.\builddir\validate_recording.exe .\data\test_session --mode step
+```
+
+The validator currently:
+
+- checks for required files: `capture.mp4`, `sync.csv`, `actions.bin`
+- parses `sync.csv` and `actions.bin`
+- reports timing, dead-period, idle-gap, and input-frequency statistics
+- supports summary, JSON, CSV, and text-based step-through modes

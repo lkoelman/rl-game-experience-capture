@@ -12,6 +12,8 @@ The package records a gameplay session as three synchronized artifacts:
 
 The intended downstream use is reinforcement-learning dataset construction from aligned `(frame, action)` pairs.
 
+The project also includes an offline validation path for checking recorded session completeness and inspecting frame-to-input alignment.
+
 ## Top-Level Structure
 
 - `include/`: public headers for the core modules
@@ -261,6 +263,32 @@ Fields:
 
 Generated files are produced by Meson/protoc and compiled into the core library.
 
+## Validation Path
+
+Files:
+
+- `include/RecordingValidator.hpp`
+- `src/RecordingValidator.cpp`
+- `include/ValidateCli.hpp`
+- `src/main_validate.cpp`
+
+`validate_recording` is an offline consumer of recorder outputs.
+
+Current responsibilities:
+
+- discover session directories from a single session path or a parent output root
+- validate that `capture.mp4`, `sync.csv`, and `actions.bin` exist and are non-empty
+- parse `sync.csv` and `actions.bin`
+- check monotonic timestamp ordering in both files
+- compute summary metrics such as duration, dead periods, longest idle gap, distinct buttons/axes/keys, and average input rate
+- emit `PASS` / `WARN` / `FAIL` verdicts
+- render human-readable summaries or machine-readable JSON/CSV output
+- provide a text-based step mode that walks aligned frames and shows the latest recorded input snapshot
+
+Important current limitation:
+
+- validator step mode is textual and alignment-based; it does not render decoded video frames
+
 ## Replay / Conversion Path
 
 Files:
@@ -403,6 +431,8 @@ Enabled tests:
 - `tests/RecordCliTests.cpp`
 - `tests/VideoRecorderPathTests.cpp`
 - `tests/CaptureSelectionTests.cpp`
+- `tests/ValidateCliTests.cpp`
+- `tests/RecordingValidatorTests.cpp`
 
 Covered behavior:
 
@@ -412,6 +442,8 @@ Covered behavior:
 - CLI argument parsing for capture-selection flags
 - pipeline-string generation for monitor/window targeting
 - monitor/window selection resolution and TUI paging helpers
+- validator CLI parsing
+- session validation metrics and integrity failure cases
 
 Not currently covered by tests:
 
@@ -446,5 +478,6 @@ Typical task entry points:
 At the moment, the actively supported built executable is:
 
 - `record_session`
+- `validate_recording`
 
 `convert_dataset` is present in source but not currently enabled in the build.

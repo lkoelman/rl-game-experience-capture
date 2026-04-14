@@ -68,6 +68,25 @@ executable(
   dependencies : [gst_dep, gst_app_dep, sdl3_dep, protobuf_dep, ftxui_dep],
 )
 
+validator_lib = static_library(
+  'validator_core',
+  'src/RecordingValidator.cpp',
+  generated_protos,
+  include_directories : inc_dir,
+  dependencies : [protobuf_dep],
+)
+
+executable(
+  'validate_recording',
+  [
+    'src/main_validate.cpp',
+    generated_protos,
+  ],
+  include_directories : inc_dir,
+  link_with : validator_lib,
+  dependencies : [protobuf_dep],
+)
+
 # Requires OpenCV
 # executable(
 #   'convert_dataset',
@@ -126,5 +145,28 @@ test(
     link_with : core_lib,
     cpp_args : ['-I' + (meson.current_build_dir() / 'librecorder_core.a.p')],
     dependencies : [gst_dep, gst_app_dep, sdl3_dep, protobuf_dep],
+  ),
+)
+
+test(
+  'validate_cli',
+  executable(
+    'validate_cli_tests',
+    'tests/ValidateCliTests.cpp',
+    include_directories : test_inc_dir,
+  ),
+)
+
+test(
+  'recording_validator',
+  executable(
+    'recording_validator_tests',
+    [
+      'tests/RecordingValidatorTests.cpp',
+      'src/RecordingValidator.cpp',
+    ],
+    generated_protos,
+    include_directories : inc_dir,
+    dependencies : [protobuf_dep],
   ),
 )
