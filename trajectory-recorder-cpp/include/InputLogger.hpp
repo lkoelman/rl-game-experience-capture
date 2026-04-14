@@ -13,17 +13,26 @@
 
 namespace trajectory {
 
+// Captures SDL input state snapshots and appends them to actions.bin.
 class InputLogger {
 public:
     explicit InputLogger(const std::string& output_path);
     ~InputLogger();
 
+    // Opens the output file, initializes SDL, and launches the event loop thread.
     void Start();
+
+    // Stops the worker, closes the controller handle, and shuts SDL down.
     void Stop();
 
 private:
+    // Polls SDL events and writes a full state snapshot after each input mutation.
     void EventLoop();
+
+    // Serializes one protobuf snapshot as a little-endian length-prefixed record.
     void WriteState(const GamepadState& state);
+
+    // Converts the current in-memory input state into the on-disk protobuf schema.
     GamepadState SnapshotState(std::uint64_t monotonic_ns) const;
 
     std::string output_path_;

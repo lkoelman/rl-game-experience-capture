@@ -8,6 +8,7 @@ namespace trajectory {
 
 namespace {
 
+// Uses steady_clock so video/input alignment stays in the same monotonic time domain.
 std::uint64_t NowMonotonicNs() {
     return static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -15,6 +16,7 @@ std::uint64_t NowMonotonicNs() {
             .count());
 }
 
+// Encapsulates the current Windows-only capture pipeline in one place.
 std::string BuildPipelineDescription(const std::string& output_path) {
     return "d3d11screencapturesrc ! videoconvert ! videoscale ! "
            "video/x-raw,framerate=30/1,width=1280,height=720 ! "
@@ -62,7 +64,7 @@ void VideoRecorder::Start() {
         throw std::runtime_error("failed to get probe_point src pad");
     }
 
-    // Add probe callback to log frame timestamps
+    // The probe is the only place where video PTS and the local monotonic clock are observed together.
     gst_pad_add_probe(src_pad, GST_PAD_PROBE_TYPE_BUFFER, &VideoRecorder::PadProbeCallback, this, nullptr);
     gst_object_unref(src_pad);
     gst_object_unref(probe);
@@ -72,6 +74,7 @@ void VideoRecorder::Start() {
     gst_bus_add_watch(bus, &VideoRecorder::BusCall, this);
     gst_object_unref(bus);
 
+    // GStreamer bus messages are handled on a dedicated GLib loop instead of the caller thread.
     loop_thread_ = std::thread([this]() { g_main_loop_run(loop_); });
 
     if (gst_element_set_state(pipeline_, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
@@ -88,6 +91,7 @@ void VideoRecorder::Stop() {
     }
 
     if (pipeline_ != nullptr) {
+        // EOS lets muxers flush their trailers before the pipeline is forced to NULL.
         gst_element_send_event(pipeline_, gst_event_new_eos());
         gst_element_set_state(pipeline_, GST_STATE_NULL);
     }

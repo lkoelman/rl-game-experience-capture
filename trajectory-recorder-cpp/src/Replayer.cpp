@@ -29,6 +29,7 @@ bool TrajectoryReplayer::GetNextStep(cv::Mat& out_frame, GamepadState& out_actio
         return false;
     }
 
+    // sync.csv is the authority for which monotonic timestamp belongs to the current decoded frame.
     const auto& row = sync_data_.at(current_frame_idx_++);
     out_action = GetActionForTimestamp(row.monotonic_ns);
     return true;
@@ -67,6 +68,7 @@ void TrajectoryReplayer::LoadActions(const std::string& path) {
     }
 
     while (input.peek() != std::char_traits<char>::eof()) {
+        // The input stream format matches BinaryIO + protobuf serialization from InputLogger.
         const auto payload = ReadLengthPrefixedPayload(input);
         GamepadState state;
         if (!state.ParseFromArray(payload.data(), static_cast<int>(payload.size()))) {
@@ -81,6 +83,7 @@ GamepadState TrajectoryReplayer::GetActionForTimestamp(std::uint64_t target_ns) 
         throw std::runtime_error("no recorded actions available");
     }
 
+    // Actions are append-only in time order, so upper_bound finds the latest snapshot at or before the frame.
     const auto upper = std::upper_bound(
         actions_.begin(),
         actions_.end(),

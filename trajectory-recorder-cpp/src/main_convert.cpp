@@ -11,6 +11,7 @@ int main(int argc, char* argv[]) {
     }
 
     try {
+        // This CLI is a thin smoke-test-style consumer of the offline replay path.
         trajectory::TrajectoryReplayer replayer(argv[1], argv[2], argv[3]);
         cv::Mat frame;
         trajectory::GamepadState action;
@@ -26,4 +27,3 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
-

@@ -14,6 +14,7 @@ SyncLogger::SyncLogger(const std::string& filepath) : out_csv_(filepath, std::io
 SyncLogger::~SyncLogger() = default;
 
 void SyncLogger::LogFrame(std::uint64_t monotonic_ns, std::uint64_t pts) {
+    // The pad probe may be invoked off the caller thread, so CSV appends are serialized here.
     std::lock_guard<std::mutex> lock(mtx_);
     out_csv_ << frame_count_++ << ',' << monotonic_ns << ',' << pts << '\n';
     if (!out_csv_) {
@@ -22,4 +23,3 @@ void SyncLogger::LogFrame(std::uint64_t monotonic_ns, std::uint64_t pts) {
 }
 
 }  // namespace trajectory
-

@@ -11,6 +11,7 @@ namespace trajectory {
 
 namespace {
 
+// Uses the same monotonic clock source as VideoRecorder for offline alignment.
 std::uint64_t NowMonotonicNs() {
     return static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -115,12 +116,14 @@ void InputLogger::EventLoop() {
                 break;
             }
 
+            // Persist a full snapshot after every input mutation so replay only needs timestamp lookup.
             const auto snapshot = SnapshotState(NowMonotonicNs());
             SDL_UnlockMutex(state_mutex_);
             WriteState(snapshot);
         }
 
         if (!saw_event) {
+            // Yield when idle; this loop is event-driven rather than fixed-rate sampled.
             SDL_Delay(1);
         }
     }
@@ -158,4 +161,3 @@ GamepadState InputLogger::SnapshotState(std::uint64_t monotonic_ns) const {
 }
 
 }  // namespace trajectory
-

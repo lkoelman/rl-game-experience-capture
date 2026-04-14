@@ -10,16 +10,23 @@
 
 namespace trajectory {
 
+// Owns the GStreamer pipeline that captures video and emits sync timestamps.
 class VideoRecorder {
 public:
     VideoRecorder(const std::string& output_path, std::shared_ptr<SyncLogger> sync_logger);
     ~VideoRecorder();
 
+    // Builds the pipeline, attaches the probe, and starts the GLib main loop thread.
     void Start();
+
+    // Sends EOS and blocks until the GLib loop and pipeline are torn down.
     void Stop();
 
 private:
+    // Runs on the GStreamer streaming thread to pair frame PTS with a monotonic clock timestamp.
     static GstPadProbeReturn PadProbeCallback(GstPad* pad, GstPadProbeInfo* info, gpointer user_data);
+
+    // Runs on the GLib main loop thread to terminate on EOS or pipeline error.
     static gboolean BusCall(GstBus* bus, GstMessage* msg, gpointer data);
 
     std::string output_path_;
@@ -31,4 +38,3 @@ private:
 };
 
 }  // namespace trajectory
-

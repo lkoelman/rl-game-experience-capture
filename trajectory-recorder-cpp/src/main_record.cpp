@@ -52,6 +52,7 @@ int main(int argc, char* argv[]) {
 #endif
 
     try {
+        // GStreamer must be initialized before Session constructs the recorder pipeline.
         gst_init(&argc, &argv);
 
         trajectory::Session session(output_dir, session_name);
@@ -62,6 +63,7 @@ int main(int argc, char* argv[]) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
+        // Session owns the coordinated shutdown order for recorder components.
         std::cout << "\nGraceful shutdown initiated..." << std::endl;
         session.Stop();
         std::cout << "Session saved successfully." << std::endl;
@@ -72,4 +74,3 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
-

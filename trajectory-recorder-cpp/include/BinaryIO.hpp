@@ -9,6 +9,7 @@
 
 namespace trajectory {
 
+// Shared framing helper for on-disk binary records written by InputLogger.
 inline void WriteUint32LittleEndian(std::ostream& out, std::uint32_t value) {
     const std::array<char, 4> bytes{
         static_cast<char>(value & 0xffu),
@@ -22,6 +23,7 @@ inline void WriteUint32LittleEndian(std::ostream& out, std::uint32_t value) {
     }
 }
 
+// Reads the fixed-width record prefix used by actions.bin.
 inline std::uint32_t ReadUint32LittleEndian(std::istream& in) {
     const auto b0 = in.get();
     const auto b1 = in.get();
@@ -37,6 +39,7 @@ inline std::uint32_t ReadUint32LittleEndian(std::istream& in) {
            (static_cast<std::uint32_t>(static_cast<unsigned char>(b3)) << 24u);
 }
 
+// Writes one binary record as [u32 length][payload].
 inline void WriteLengthPrefixedPayload(std::ostream& out, const std::string& payload) {
     if (payload.size() > UINT32_MAX) {
         throw std::runtime_error("payload exceeds 32-bit length prefix");
@@ -48,6 +51,7 @@ inline void WriteLengthPrefixedPayload(std::ostream& out, const std::string& pay
     }
 }
 
+// Reads one binary record from the framing used by actions.bin.
 inline std::string ReadLengthPrefixedPayload(std::istream& in) {
     const auto length = ReadUint32LittleEndian(in);
     std::string payload(length, '\0');

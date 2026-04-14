@@ -10,6 +10,7 @@ namespace trajectory {
 
 namespace {
 
+// Materializes the per-session output folder before any recorder component starts writing.
 std::filesystem::path EnsureSessionDirectory(const std::string& output_dir, const std::string& session_name) {
     auto session_dir = std::filesystem::path(output_dir) / session_name;
     std::filesystem::create_directories(session_dir);
@@ -28,11 +29,13 @@ Session::Session(const std::string& output_dir, const std::string& session_name)
 Session::~Session() = default;
 
 void Session::Start() {
+    // Input starts first so the earliest controller/keyboard events are captured before video is live.
     input_logger_->Start();
     video_recorder_->Start();
 }
 
 void Session::Stop() {
+    // Video stops first so the sync log is finalized before input capture exits.
     video_recorder_->Stop();
     input_logger_->Stop();
 }

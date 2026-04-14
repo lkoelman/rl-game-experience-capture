@@ -9,11 +9,16 @@ class InputLogger;
 class SyncLogger;
 class VideoRecorder;
 
+// Coordinates the recorder subcomponents for a single output session.
 class Session {
 public:
     Session(const std::string& output_dir, const std::string& session_name);
     ~Session();
+
+    // Starts input capture and video capture for the session directory.
     void Start();
+
+    // Stops video first so frame logging closes before input capture shuts down.
     void Stop();
 
 private:
