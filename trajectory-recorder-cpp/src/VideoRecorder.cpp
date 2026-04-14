@@ -62,6 +62,7 @@ void VideoRecorder::Start() {
         throw std::runtime_error("failed to get probe_point src pad");
     }
 
+    // Add probe callback to log frame timestamps
     gst_pad_add_probe(src_pad, GST_PAD_PROBE_TYPE_BUFFER, &VideoRecorder::PadProbeCallback, this, nullptr);
     gst_object_unref(src_pad);
     gst_object_unref(probe);
