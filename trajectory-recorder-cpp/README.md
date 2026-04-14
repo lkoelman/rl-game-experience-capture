@@ -2,7 +2,7 @@
 
 C++20 scaffold for recording synchronized gameplay trajectories as video frames plus input state streams for downstream reinforcement-learning dataset conversion.
 
-## Planned stack
+## Software stack
 
 - Conan for package management
 - Meson and Ninja for builds
@@ -66,6 +66,24 @@ Then run:
 
 The helper rebuilds Conan-managed dependencies to match the active MSVC runtime, build type, and C++20 setting when needed, and it uses the Conan-provided `protoc`.
 
+## Fast Rebuild
+
+If `builddir` already exists from a successful `./scripts/build.ps1` run, you can do an incremental rebuild without rerunning Conan or Meson reconfiguration.
+
+Open a Developer PowerShell for VS and run:
+
+```powershell
+meson compile -C builddir
+```
+
+If you also want to rerun the test suite after the incremental rebuild:
+
+```powershell
+meson test -C builddir --print-errorlogs
+```
+
+Use `./scripts/build.ps1` again when dependencies, Conan settings, GStreamer location, or Meson configuration have changed.
+
 ## Clean Build Files
 
 To remove the default build output directory created by the helper script:
@@ -99,6 +117,7 @@ After building, run the executables:
 
 - `--monitor <id>` selects a monitor by the one-based ID shown in the selector
 - `--window <title>` selects a titled window by case-insensitive substring match
+- `--verbose` prints each recorded input snapshot to stdout as it is written
 - if neither flag is provided, an FTXUI-based selector opens before recording starts
 
 Examples:
@@ -106,6 +125,7 @@ Examples:
 ```powershell
 .\builddir\record_session.exe .\data test_session --monitor 1
 .\builddir\record_session.exe .\data test_session --window "Notepad"
+.\builddir\record_session.exe .\data test_session --monitor 1 --verbose
 ```
 
 When running `record_session.exe` from PowerShell on Windows, use a Developer PowerShell and make sure the GStreamer runtime `bin` directory is on `PATH`. If Windows cannot load the GStreamer DLLs, the process can exit before `main()` starts and you will see no program output.
