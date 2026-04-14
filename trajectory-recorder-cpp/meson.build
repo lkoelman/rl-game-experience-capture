@@ -116,3 +116,15 @@ test(
     include_directories : test_inc_dir,
   ),
 )
+
+test(
+  'input_logger_verbose',
+  executable(
+    'input_logger_verbose_tests',
+    'tests/InputLoggerVerboseTests.cpp',
+    include_directories : inc_dir,
+    link_with : core_lib,
+    cpp_args : ['-I' + (meson.current_build_dir() / 'librecorder_core.a.p')],
+    dependencies : [gst_dep, gst_app_dep, sdl3_dep, protobuf_dep],
+  ),
+)

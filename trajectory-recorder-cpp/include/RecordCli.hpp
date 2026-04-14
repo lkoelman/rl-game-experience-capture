@@ -20,6 +20,7 @@ struct Options {
     std::string output_dir = "./data";
     std::string session_name = "cpp_session";
     CaptureMode capture_mode = CaptureMode::interactive;
+    bool verbose = false;
     int monitor_id = 0;
     std::string window_title;
 };
@@ -45,7 +46,8 @@ inline bool HasNonWhitespace(std::string_view value) {
 }
 
 inline std::string BuildUsage(std::string_view program_name) {
-    return "Usage: " + std::string(program_name) + " [output_dir] [session_name] [--monitor <id> | --window <title>]";
+    return "Usage: " + std::string(program_name) +
+           " [output_dir] [session_name] [--monitor <id> | --window <title>] [--verbose]";
 }
 
 inline const char* DescribeStage(RunStage stage) {
@@ -100,6 +102,11 @@ inline bool TryParseArguments(const std::vector<std::string>& args,
     };
 
     for (std::size_t index = 0; index < args.size(); ++index) {
+        if (args[index] == "--verbose") {
+            options.verbose = true;
+            continue;
+        }
+
         if (args[index] == "--monitor") {
             if (monitor_id.has_value() || window_title.has_value()) {
                 error << "Error: Specify only one of --monitor or --window.\n"

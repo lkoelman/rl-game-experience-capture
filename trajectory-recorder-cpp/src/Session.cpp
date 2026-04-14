@@ -19,11 +19,11 @@ std::filesystem::path EnsureSessionDirectory(const std::string& output_dir, cons
 
 }  // namespace
 
-Session::Session(const std::string& output_dir, const std::string& session_name, CaptureTarget capture_target) {
+Session::Session(const std::string& output_dir, const std::string& session_name, CaptureTarget capture_target, bool verbose) {
     const auto session_dir = EnsureSessionDirectory(output_dir, session_name);
     sync_logger_ = std::make_shared<SyncLogger>((session_dir / "sync.csv").string());
     video_recorder_ = std::make_unique<VideoRecorder>((session_dir / "capture.mp4").string(), std::move(capture_target), sync_logger_);
-    input_logger_ = std::make_unique<InputLogger>((session_dir / "actions.bin").string());
+    input_logger_ = std::make_unique<InputLogger>((session_dir / "actions.bin").string(), verbose);
 }
 
 Session::~Session() = default;

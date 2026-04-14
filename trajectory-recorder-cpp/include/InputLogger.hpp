@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cstdint>
 #include <fstream>
+#include <iosfwd>
 #include <string>
 #include <unordered_set>
 
@@ -12,10 +13,12 @@
 
 namespace trajectory {
 
+std::string FormatVerboseState(const GamepadState& state);
+
 // Captures SDL input state snapshots and appends them to actions.bin.
 class InputLogger {
 public:
-    explicit InputLogger(const std::string& output_path);
+    explicit InputLogger(const std::string& output_path, bool verbose = false);
     ~InputLogger();
 
     // Opens the output file and initializes SDL.
@@ -35,6 +38,7 @@ private:
     GamepadState SnapshotState(std::uint64_t monotonic_ns) const;
 
     std::string output_path_;
+    bool verbose_{false};
     std::ofstream out_bin_;
     std::atomic<bool> is_running_{false};
     mutable SDL_Mutex* state_mutex_{nullptr};

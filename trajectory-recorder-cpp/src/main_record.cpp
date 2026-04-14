@@ -123,6 +123,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Recorder configuration:" << std::endl;
     std::cout << "  output_dir: " << options.output_dir << std::endl;
     std::cout << "  session_name: " << options.session_name << std::endl;
+    std::cout << "  verbose: " << (options.verbose ? "true" : "false") << std::endl;
 
     auto stage = trajectory::record_cli::RunStage::capture_selection;
     trajectory::CaptureTarget capture_target = trajectory::CaptureTarget::PrimaryMonitor();
@@ -151,7 +152,7 @@ int main(int argc, char* argv[]) {
 
         stage = trajectory::record_cli::RunStage::session_construction;
         std::cout << "Preparing output session..." << std::endl;
-        trajectory::Session session(options.output_dir, options.session_name, capture_target);
+        trajectory::Session session(options.output_dir, options.session_name, capture_target, options.verbose);
 
         stage = trajectory::record_cli::RunStage::session_start;
         std::cout << "Starting recording session..." << std::endl;

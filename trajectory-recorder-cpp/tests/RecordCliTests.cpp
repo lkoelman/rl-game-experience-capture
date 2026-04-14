@@ -103,6 +103,36 @@ void TestWindowFlagParses() {
     Expect(error.str().empty(), "valid window flag should not write errors");
 }
 
+void TestVerboseFlagParses() {
+    trajectory::record_cli::Options options;
+    std::ostringstream output;
+    std::ostringstream error;
+    const std::vector<std::string> args{"captures", "session_a", "--verbose"};
+
+    const bool ok = trajectory::record_cli::TryParseArguments(args, "record_session", options, output, error);
+
+    Expect(ok, "verbose flag should parse");
+    Expect(options.verbose, "verbose flag should enable verbose logging");
+    Expect(options.output_dir == "captures", "verbose flag should preserve positional output directory");
+    Expect(options.session_name == "session_a", "verbose flag should preserve positional session name");
+    Expect(error.str().empty(), "valid verbose flag should not write errors");
+}
+
+void TestVerboseFlagCanBeCombinedWithCaptureFlags() {
+    trajectory::record_cli::Options options;
+    std::ostringstream output;
+    std::ostringstream error;
+    const std::vector<std::string> args{"--monitor", "2", "--verbose"};
+
+    const bool ok = trajectory::record_cli::TryParseArguments(args, "record_session", options, output, error);
+
+    Expect(ok, "verbose flag should coexist with capture flags");
+    Expect(options.verbose, "verbose flag should remain enabled when combined with capture flags");
+    Expect(options.capture_mode == trajectory::record_cli::CaptureMode::monitor, "monitor flag should still take effect");
+    Expect(options.monitor_id == 2, "monitor id should still be parsed");
+    Expect(error.str().empty(), "valid verbose + monitor parse should not write errors");
+}
+
 void TestConflictingCaptureFlagsFailClearly() {
     trajectory::record_cli::Options options;
     std::ostringstream output;
@@ -134,6 +164,8 @@ void TestUsageIncludesCaptureFlags() {
 
     Expect(usage.find("[--monitor <id> | --window <title>]") != std::string::npos,
            "usage should describe the capture selection flags");
+    Expect(usage.find("[--verbose]") != std::string::npos,
+           "usage should describe the verbose flag");
 }
 
 }  // namespace
@@ -146,6 +178,8 @@ int main() {
     TestFailureMessagesNameTheLifecycleStage();
     TestMonitorFlagParses();
     TestWindowFlagParses();
+    TestVerboseFlagParses();
+    TestVerboseFlagCanBeCombinedWithCaptureFlags();
     TestConflictingCaptureFlagsFailClearly();
     TestInvalidMonitorIdFailsClearly();
     TestUsageIncludesCaptureFlags();

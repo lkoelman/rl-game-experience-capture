@@ -14,7 +14,7 @@ class VideoRecorder;
 // Coordinates the recorder subcomponents for a single output session.
 class Session {
 public:
-    Session(const std::string& output_dir, const std::string& session_name, CaptureTarget capture_target);
+    Session(const std::string& output_dir, const std::string& session_name, CaptureTarget capture_target, bool verbose);
     ~Session();
 
     // Starts input capture and video capture for the session directory.

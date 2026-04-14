@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <vector>
 
@@ -21,7 +23,34 @@ std::uint64_t NowMonotonicNs() {
 
 }  // namespace
 
-InputLogger::InputLogger(const std::string& output_path) : output_path_(output_path) {
+std::string FormatVerboseState(const GamepadState& state) {
+    std::ostringstream formatted;
+    formatted << "input monotonic_ns=" << state.monotonic_ns() << " axes=[";
+    for (int index = 0; index < state.axes_size(); ++index) {
+        if (index > 0) {
+            formatted << ',';
+        }
+        formatted << state.axes(index);
+    }
+    formatted << "] buttons=[";
+    for (int index = 0; index < state.pressed_buttons_size(); ++index) {
+        if (index > 0) {
+            formatted << ',';
+        }
+        formatted << state.pressed_buttons(index);
+    }
+    formatted << "] keys=[";
+    for (int index = 0; index < state.pressed_keys_size(); ++index) {
+        if (index > 0) {
+            formatted << ',';
+        }
+        formatted << state.pressed_keys(index);
+    }
+    formatted << ']';
+    return formatted.str();
+}
+
+InputLogger::InputLogger(const std::string& output_path, bool verbose) : output_path_(output_path), verbose_(verbose) {
     state_mutex_ = SDL_CreateMutex();
     if (state_mutex_ == nullptr) {
         throw std::runtime_error("failed to create SDL mutex");
@@ -111,6 +140,9 @@ void InputLogger::PumpEventsOnce() {
 
         if (state_changed) {
             WriteState(snapshot);
+            if (verbose_) {
+                std::cout << FormatVerboseState(snapshot) << std::endl;
+            }
         }
     }
 
