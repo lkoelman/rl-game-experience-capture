@@ -1,4 +1,4 @@
-Record video game experiences as state-action trajectories for policy learning.
+Experiments with video-action models and world models.
 
-- [trajectory-recorder](./trajectory-recorder/) : recordings scripts in Python and C++
-- [object-detection-mota](./object-detection-mota/) : multi-object detection and tracking experiments
+- [trajectory-recorder-cpp](./trajectory-recorder-cpp/) : (state, action) trajectory recording for video games: records screen and gamepad with frame synchronization data
+- [object-detection-mota](./object-detection-mota/) : multi-object detection and tracking samples
