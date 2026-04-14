@@ -1,12 +1,6 @@
 
 # Rules
 
-## C++ Development
-
-On Windows:
-- use windows subsystem for linux (WSL) for static analysis tool
-    - example: `wsl cppcheck --help`
-
 ## Test-Driven Development (TDD) Workflow
 
 **Strong preference for TDD**; Claude should guide this workflow proactively.
@@ -101,3 +95,18 @@ When modifying code, check if these docs need updates:
 - Deprecations: mark as deprecated in docs, add migration guide if needed
 
 **Before committing**, ask: "Did I update the docs?"
+
+## Inspecting Example Code
+
+When asked to inspect code accessible through a github URL or other hosted git service, always use `git clone` rather than web fetch tools.
+Clone or download the code to a temporary folder.
+
+Examples:
+
+```sh
+# shallow clone (single commit), to look around
+git clone --depth 1 <repo-url> <temp-dir>
+
+# for single files: use githubusercontent.com
+curl -L -o <temp-dir>/README.md https://raw.githubusercontent.com/<user>/<repo>/refs/heads/<branch>/README.md
+```

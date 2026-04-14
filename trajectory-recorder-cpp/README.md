@@ -88,7 +88,28 @@ conan remove "*" --confirm
 
 This removes all cached Conan packages and metadata from your local Conan cache, so the next build will resolve and rebuild dependencies from scratch.
 
-## Executables
+## Usage
+
+After building, run the executables:
 
 - `record_session [output_dir] [session_name]`
 - `convert_dataset <capture.mp4> <sync.csv> <actions.bin>`
+
+When running `record_session.exe` from PowerShell on Windows, use a Developer PowerShell and make sure the GStreamer runtime `bin` directory is on `PATH`. If Windows cannot load the GStreamer DLLs, the process can exit before `main()` starts and you will see no program output.
+
+Example:
+
+```powershell
+$env:GSTREAMER_1_0_ROOT_X86_64 = 'C:\Program Files\gstreamer\1.0\msvc_x86_64'
+$env:PATH = "$env:GSTREAMER_1_0_ROOT_X86_64\bin;$env:PATH"
+
+.\builddir\record_session.exe .\data test_session
+```
+
+If you want to rebuild and then run in the same shell:
+
+```powershell
+./scripts/build.ps1
+$env:PATH = "C:\Program Files\gstreamer\1.0\msvc_x86_64\bin;$env:PATH"
+.\builddir\record_session.exe .\data test_session
+```
