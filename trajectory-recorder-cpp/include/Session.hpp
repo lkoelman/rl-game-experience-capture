@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "CaptureTarget.hpp"
+
 namespace trajectory {
 
 class InputLogger;
@@ -12,7 +14,7 @@ class VideoRecorder;
 // Coordinates the recorder subcomponents for a single output session.
 class Session {
 public:
-    Session(const std::string& output_dir, const std::string& session_name);
+    Session(const std::string& output_dir, const std::string& session_name, CaptureTarget capture_target);
     ~Session();
 
     // Starts input capture and video capture for the session directory.

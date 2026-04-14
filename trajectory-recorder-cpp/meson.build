@@ -8,6 +8,7 @@ project(
 cpp = meson.get_compiler('cpp')
 protobuf_dep = dependency('protobuf')
 sdl3_dep = dependency('sdl')
+ftxui_dep = dependency('ftxui')
 
 gst_root = meson.get_external_property('gstreamer_root', '')
 if gst_root == ''
@@ -45,6 +46,7 @@ core_lib = static_library(
   'recorder_core',
   [
     'src/Session.cpp',
+    'src/CaptureSelection.cpp',
     'src/VideoRecorder.cpp',
     'src/InputLogger.cpp',
     'src/SyncLogger.cpp',
@@ -57,10 +59,13 @@ core_lib = static_library(
 
 executable(
   'record_session',
-  'src/main_record.cpp',
+  [
+    'src/main_record.cpp',
+    'src/CaptureSelector.cpp',
+  ],
   include_directories : inc_dir,
   link_with : core_lib,
-  dependencies : [gst_dep, gst_app_dep, sdl3_dep, protobuf_dep],
+  dependencies : [gst_dep, gst_app_dep, sdl3_dep, protobuf_dep, ftxui_dep],
 )
 
 # Requires OpenCV
@@ -96,6 +101,18 @@ test(
   executable(
     'video_recorder_path_tests',
     'tests/VideoRecorderPathTests.cpp',
+    include_directories : test_inc_dir,
+  ),
+)
+
+test(
+  'capture_selection',
+  executable(
+    'capture_selection_tests',
+    [
+      'tests/CaptureSelectionTests.cpp',
+      'src/CaptureSelection.cpp',
+    ],
     include_directories : test_inc_dir,
   ),
 )

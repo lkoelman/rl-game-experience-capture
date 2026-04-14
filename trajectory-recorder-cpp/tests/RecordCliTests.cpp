@@ -73,6 +73,69 @@ void TestFailureMessagesNameTheLifecycleStage() {
         "session stop failures should name the shutdown stage");
 }
 
+void TestMonitorFlagParses() {
+    trajectory::record_cli::Options options;
+    std::ostringstream output;
+    std::ostringstream error;
+    const std::vector<std::string> args{"captures", "session_a", "--monitor", "2"};
+
+    const bool ok = trajectory::record_cli::TryParseArguments(args, "record_session", options, output, error);
+
+    Expect(ok, "monitor flag should parse");
+    Expect(options.output_dir == "captures", "explicit output directory should be preserved");
+    Expect(options.session_name == "session_a", "explicit session name should be preserved");
+    Expect(options.capture_mode == trajectory::record_cli::CaptureMode::monitor, "capture mode should be monitor");
+    Expect(options.monitor_id == 2, "monitor id should be parsed as one-based");
+    Expect(error.str().empty(), "valid monitor flag should not write errors");
+}
+
+void TestWindowFlagParses() {
+    trajectory::record_cli::Options options;
+    std::ostringstream output;
+    std::ostringstream error;
+    const std::vector<std::string> args{"--window", "Notepad"};
+
+    const bool ok = trajectory::record_cli::TryParseArguments(args, "record_session", options, output, error);
+
+    Expect(ok, "window flag should parse");
+    Expect(options.capture_mode == trajectory::record_cli::CaptureMode::window, "capture mode should be window");
+    Expect(options.window_title == "Notepad", "window title should be preserved");
+    Expect(error.str().empty(), "valid window flag should not write errors");
+}
+
+void TestConflictingCaptureFlagsFailClearly() {
+    trajectory::record_cli::Options options;
+    std::ostringstream output;
+    std::ostringstream error;
+    const std::vector<std::string> args{"--monitor", "1", "--window", "Notepad"};
+
+    const bool ok = trajectory::record_cli::TryParseArguments(args, "record_session", options, output, error);
+
+    Expect(!ok, "conflicting capture flags should fail");
+    Expect(error.str().find("Specify only one of --monitor or --window") != std::string::npos,
+           "error should explain the conflicting capture flags");
+}
+
+void TestInvalidMonitorIdFailsClearly() {
+    trajectory::record_cli::Options options;
+    std::ostringstream output;
+    std::ostringstream error;
+    const std::vector<std::string> args{"--monitor", "0"};
+
+    const bool ok = trajectory::record_cli::TryParseArguments(args, "record_session", options, output, error);
+
+    Expect(!ok, "zero monitor id should fail");
+    Expect(error.str().find("monitor id must be a positive integer") != std::string::npos,
+           "error should explain the invalid monitor id");
+}
+
+void TestUsageIncludesCaptureFlags() {
+    const std::string usage = trajectory::record_cli::BuildUsage("record_session");
+
+    Expect(usage.find("[--monitor <id> | --window <title>]") != std::string::npos,
+           "usage should describe the capture selection flags");
+}
+
 }  // namespace
 
 int main() {
@@ -81,5 +144,10 @@ int main() {
     TestBlankSessionNameFailsClearly();
     TestBlankOutputDirectoryFailsClearly();
     TestFailureMessagesNameTheLifecycleStage();
+    TestMonitorFlagParses();
+    TestWindowFlagParses();
+    TestConflictingCaptureFlagsFailClearly();
+    TestInvalidMonitorIdFailsClearly();
+    TestUsageIncludesCaptureFlags();
     return 0;
 }

@@ -2,6 +2,7 @@
 #include <chrono>
 #include <csignal>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -12,6 +13,7 @@
 
 #include <gst/gst.h>
 
+#include "CaptureSelector.hpp"
 #include "RecordCli.hpp"
 #include "Session.hpp"
 
@@ -76,6 +78,39 @@ std::string ProgramName(char* argv[]) {
     return argv[0];
 }
 
+trajectory::CaptureTarget ResolveCaptureTarget(const trajectory::record_cli::Options& options) {
+    using trajectory::SelectionResult;
+    using trajectory::record_cli::CaptureMode;
+
+    SelectionResult result;
+    switch (options.capture_mode) {
+    case CaptureMode::interactive:
+        result = trajectory::PromptForCaptureTarget(trajectory::EnumerateMonitors(), trajectory::EnumerateWindows());
+        break;
+    case CaptureMode::monitor:
+        result = trajectory::ResolveMonitorTarget(trajectory::EnumerateMonitors(), options.monitor_id);
+        break;
+    case CaptureMode::window:
+        result = trajectory::ResolveWindowTarget(trajectory::EnumerateWindows(), options.window_title);
+        break;
+    }
+
+    if (!result.ok) {
+        throw std::runtime_error(result.error);
+    }
+
+    return result.target;
+}
+
+void PrintCaptureTarget(const trajectory::CaptureTarget& capture_target) {
+    if (capture_target.kind == trajectory::CaptureTargetKind::window) {
+        std::cout << "  capture_target: window \"" << capture_target.window_title << "\"" << std::endl;
+        return;
+    }
+
+    std::cout << "  capture_target: monitor " << capture_target.monitor_id << std::endl;
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -88,13 +123,26 @@ int main(int argc, char* argv[]) {
     std::cout << "Recorder configuration:" << std::endl;
     std::cout << "  output_dir: " << options.output_dir << std::endl;
     std::cout << "  session_name: " << options.session_name << std::endl;
+
+    auto stage = trajectory::record_cli::RunStage::capture_selection;
+    trajectory::CaptureTarget capture_target = trajectory::CaptureTarget::PrimaryMonitor();
+
+    try {
+        std::cout << "Selecting capture target..." << std::endl;
+        capture_target = ResolveCaptureTarget(options);
+        PrintCaptureTarget(capture_target);
+    } catch (const std::exception& error) {
+        std::cerr << "Error while " << trajectory::record_cli::DescribeStage(stage) << ": " << error.what() << std::endl;
+        return 1;
+    }
+
     std::cout << "Installing shutdown handlers..." << std::endl;
 
     if (!InstallSignalHandlers(std::cerr)) {
         return 1;
     }
 
-    auto stage = trajectory::record_cli::RunStage::signal_handler_installation;
+    stage = trajectory::record_cli::RunStage::signal_handler_installation;
     try {
         // GStreamer must be initialized before Session constructs the recorder pipeline.
         stage = trajectory::record_cli::RunStage::gstreamer_initialization;
@@ -103,7 +151,7 @@ int main(int argc, char* argv[]) {
 
         stage = trajectory::record_cli::RunStage::session_construction;
         std::cout << "Preparing output session..." << std::endl;
-        trajectory::Session session(options.output_dir, options.session_name);
+        trajectory::Session session(options.output_dir, options.session_name, capture_target);
 
         stage = trajectory::record_cli::RunStage::session_start;
         std::cout << "Starting recording session..." << std::endl;

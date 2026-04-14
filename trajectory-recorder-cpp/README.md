@@ -95,6 +95,19 @@ After building, run the executables:
 - `record_session [output_dir] [session_name]`
 - `convert_dataset <capture.mp4> <sync.csv> <actions.bin>`
 
+`record_session` now supports pre-recording capture selection:
+
+- `--monitor <id>` selects a monitor by the one-based ID shown in the selector
+- `--window <title>` selects a titled window by case-insensitive substring match
+- if neither flag is provided, an FTXUI-based selector opens before recording starts
+
+Examples:
+
+```powershell
+.\builddir\record_session.exe .\data test_session --monitor 1
+.\builddir\record_session.exe .\data test_session --window "Notepad"
+```
+
 When running `record_session.exe` from PowerShell on Windows, use a Developer PowerShell and make sure the GStreamer runtime `bin` directory is on `PATH`. If Windows cannot load the GStreamer DLLs, the process can exit before `main()` starts and you will see no program output.
 The recorder also pumps SDL input events on the main thread. If that polling is moved to a worker thread, SDL 3 can raise assertion popups on Windows.
 

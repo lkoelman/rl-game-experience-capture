@@ -27,7 +27,7 @@ The project builds with Conan + Meson + Ninja on Windows.
 
 Key points:
 
-- Conan manages `protobuf` and `sdl`; OpenCV is currently commented out in `conanfile.txt`.
+- Conan manages `protobuf`, `sdl`, and `ftxui`; OpenCV is currently commented out in `conanfile.txt`.
 - GStreamer is not consumed through Conan. The build uses an existing Windows GStreamer installation root.
 - `scripts/build.ps1` is the canonical build path. It:
   - validates the GStreamer root
@@ -46,13 +46,17 @@ Important implication for agents:
 The runtime path for recording is:
 
 1. `src/main_record.cpp`
-2. `trajectory::Session`
-3. `trajectory::InputLogger`
-4. `trajectory::VideoRecorder`
-5. `trajectory::SyncLogger`
+2. `trajectory::CaptureSelector`
+3. `trajectory::CaptureSelection`
+4. `trajectory::Session`
+5. `trajectory::InputLogger`
+6. `trajectory::VideoRecorder`
+7. `trajectory::SyncLogger`
 
 `main_record.cpp` is a thin CLI wrapper:
 
+- parses capture-selection flags
+- resolves a monitor/window target from CLI or the FTXUI selector
 - initializes GStreamer with `gst_init`
 - installs console shutdown handlers
 - creates a `Session`
@@ -87,6 +91,8 @@ Current lifecycle:
 - `PumpEventsOnce()` forwards the main-thread SDL event pump to `InputLogger`
 - `Stop()` stops `VideoRecorder` first, then `InputLogger`
 
+Construction now also receives a resolved `CaptureTarget`, which it forwards to `VideoRecorder`.
+
 The public header only forward-declares the owned classes to keep protobuf- and GStreamer-heavy dependencies out of the CLI compile boundary.
 
 ### `VideoRecorder`
@@ -102,10 +108,44 @@ Current implementation details:
 
 - pipeline is built from a string in `BuildPipelineDescription()`
 - uses `d3d11screencapturesrc`
+- accepts a resolved capture target and sets either `monitor-handle`/`monitor-index` or `window-handle`
 - converts/scales to `1280x720` at `30 fps`
 - inserts `identity name=probe_point` as frame synchronization hook (identifier)
 - encodes with `x264enc`
 - writes `mp4`
+
+### `CaptureSelection`
+
+Files:
+
+- `include/CaptureSelection.hpp`
+- `src/CaptureSelection.cpp`
+
+This is the deterministic selection helper layer shared by the CLI and the interactive selector.
+
+Responsibilities:
+
+- represent enumerated monitor/window options
+- resolve `--monitor <id>` to a capture target
+- resolve `--window <title>` using case-insensitive substring matching
+- format monitor/window labels for display
+- build 1-9 shortcut pages for the TUI
+
+### `CaptureSelector`
+
+Files:
+
+- `include/CaptureSelector.hpp`
+- `src/CaptureSelector.cpp`
+
+This is the Windows-only startup UI/integration layer.
+
+Responsibilities:
+
+- enumerate monitors via Win32 APIs, including display name, resolution, and position
+- enumerate visible titled top-level windows and enrich them with process metadata
+- run the FTXUI selector when the user did not provide `--monitor` or `--window`
+- return a resolved `CaptureTarget` to `main_record.cpp`
 
 Synchronization behavior:
 
@@ -200,7 +240,7 @@ It is used by:
 - `TrajectoryReplayer::LoadActions()`
 - tests in `tests/BinaryIOTests.cpp`
 
-This is currently the most isolated deterministic part of the codebase and the only part covered by automated tests.
+This remains one of the most isolated deterministic parts of the codebase.
 
 ### Protobuf Schema
 
@@ -360,12 +400,18 @@ Current test coverage is minimal.
 Enabled tests:
 
 - `tests/BinaryIOTests.cpp`
+- `tests/RecordCliTests.cpp`
+- `tests/VideoRecorderPathTests.cpp`
+- `tests/CaptureSelectionTests.cpp`
 
 Covered behavior:
 
 - little-endian `uint32_t` encoding
 - length-prefixed payload round-trip
 - short-read failure path
+- CLI argument parsing for capture-selection flags
+- pipeline-string generation for monitor/window targeting
+- monitor/window selection resolution and TUI paging helpers
 
 Not currently covered by tests:
 

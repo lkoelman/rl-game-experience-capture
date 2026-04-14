@@ -1,6 +1,7 @@
 [requires]
 protobuf/3.21.12
 sdl/3.4.0
+ftxui/6.1.9
 # OpenCV required for convert_dataset only
 # opencv/4.8.1
 

@@ -8,6 +8,7 @@
 #include <string>
 #include <thread>
 
+#include "CaptureTarget.hpp"
 #include "SyncLogger.hpp"
 
 namespace trajectory {
@@ -15,7 +16,7 @@ namespace trajectory {
 // Owns the GStreamer pipeline that captures video and emits sync timestamps.
 class VideoRecorder {
 public:
-    VideoRecorder(const std::string& output_path, std::shared_ptr<SyncLogger> sync_logger);
+    VideoRecorder(const std::string& output_path, CaptureTarget capture_target, std::shared_ptr<SyncLogger> sync_logger);
     ~VideoRecorder();
 
     // Builds the pipeline, attaches the probe, and starts the GLib main loop thread.
@@ -25,6 +26,7 @@ public:
     void Stop();
 
 private:
+    CaptureTarget capture_target_;
     // Runs on the GStreamer streaming thread to pair frame PTS with a monotonic clock timestamp.
     static GstPadProbeReturn PadProbeCallback(GstPad* pad, GstPadProbeInfo* info, gpointer user_data);
 

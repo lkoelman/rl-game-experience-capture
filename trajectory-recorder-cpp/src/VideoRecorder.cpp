@@ -23,8 +23,8 @@ std::uint64_t NowMonotonicNs() {
 
 }  // namespace
 
-VideoRecorder::VideoRecorder(const std::string& output_path, std::shared_ptr<SyncLogger> sync_logger)
-    : output_path_(output_path), sync_logger_(std::move(sync_logger)) {}
+VideoRecorder::VideoRecorder(const std::string& output_path, CaptureTarget capture_target, std::shared_ptr<SyncLogger> sync_logger)
+    : output_path_(output_path), sync_logger_(std::move(sync_logger)), capture_target_(std::move(capture_target)) {}
 
 VideoRecorder::~VideoRecorder() {
     Stop();
@@ -42,7 +42,7 @@ void VideoRecorder::Start() {
     }
 
     GError* error = nullptr;
-    pipeline_ = gst_parse_launch(BuildPipelineDescriptionForTesting(output_path_).c_str(), &error);
+    pipeline_ = gst_parse_launch(BuildPipelineDescriptionForTesting(output_path_, capture_target_).c_str(), &error);
     if (pipeline_ == nullptr) {
         const std::string message = error != nullptr ? error->message : "unknown GStreamer pipeline error";
         if (error != nullptr) {
