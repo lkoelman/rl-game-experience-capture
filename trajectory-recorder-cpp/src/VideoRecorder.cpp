@@ -1,12 +1,17 @@
 #include "VideoRecorder.hpp"
 
 #include <chrono>
+#include <iostream>
 #include <stdexcept>
 #include <utility>
+
+#include "VideoRecorderPipeline.hpp"
 
 namespace trajectory {
 
 namespace {
+
+constexpr auto kStopTimeout = std::chrono::seconds(5);
 
 // Uses steady_clock so video/input alignment stays in the same monotonic time domain.
 std::uint64_t NowMonotonicNs() {
@@ -14,15 +19,6 @@ std::uint64_t NowMonotonicNs() {
         std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now().time_since_epoch())
             .count());
-}
-
-// Encapsulates the current Windows-only capture pipeline in one place.
-std::string BuildPipelineDescription(const std::string& output_path) {
-    return "d3d11screencapturesrc ! videoconvert ! videoscale ! "
-           "video/x-raw,framerate=30/1,width=1280,height=720 ! "
-           "identity name=probe_point ! x264enc tune=zerolatency speed-preset=veryfast ! "
-           "mp4mux ! filesink location=\"" +
-           output_path + "\"";
 }
 
 }  // namespace
@@ -39,8 +35,14 @@ void VideoRecorder::Start() {
         return;
     }
 
+    {
+        std::lock_guard<std::mutex> lock(stop_mutex_);
+        eos_or_error_received_ = false;
+        stop_error_message_.clear();
+    }
+
     GError* error = nullptr;
-    pipeline_ = gst_parse_launch(BuildPipelineDescription(output_path_).c_str(), &error);
+    pipeline_ = gst_parse_launch(BuildPipelineDescriptionForTesting(output_path_).c_str(), &error);
     if (pipeline_ == nullptr) {
         const std::string message = error != nullptr ? error->message : "unknown GStreamer pipeline error";
         if (error != nullptr) {
@@ -90,9 +92,32 @@ void VideoRecorder::Stop() {
         return;
     }
 
-    if (pipeline_ != nullptr) {
+    if (pipeline_ != nullptr && started_) {
+        bool wait_for_finalize = false;
+        {
+            std::lock_guard<std::mutex> lock(stop_mutex_);
+            eos_or_error_received_ = false;
+            stop_error_message_.clear();
+        }
+
         // EOS lets muxers flush their trailers before the pipeline is forced to NULL.
-        gst_element_send_event(pipeline_, gst_event_new_eos());
+        if (!gst_element_send_event(pipeline_, gst_event_new_eos())) {
+            std::cerr << "Warning: failed to send EOS to the GStreamer pipeline during shutdown." << std::endl;
+        } else {
+            wait_for_finalize = true;
+        }
+
+        if (wait_for_finalize) {
+            std::unique_lock<std::mutex> lock(stop_mutex_);
+            if (!stop_cv_.wait_for(lock, kStopTimeout, [this]() { return eos_or_error_received_; })) {
+                std::cerr << "Warning: timed out waiting for the video pipeline to finalize after EOS." << std::endl;
+            } else if (!stop_error_message_.empty()) {
+                std::cerr << "Warning: video pipeline reported an error while finalizing output: " << stop_error_message_ << std::endl;
+            }
+        }
+    }
+
+    if (pipeline_ != nullptr) {
         gst_element_set_state(pipeline_, GST_STATE_NULL);
     }
 
@@ -131,11 +156,40 @@ gboolean VideoRecorder::BusCall(GstBus*, GstMessage* msg, gpointer data) {
     auto* self = static_cast<VideoRecorder*>(data);
     switch (GST_MESSAGE_TYPE(msg)) {
     case GST_MESSAGE_EOS:
+        {
+            std::lock_guard<std::mutex> lock(self->stop_mutex_);
+            self->eos_or_error_received_ = true;
+            self->stop_error_message_.clear();
+        }
+        self->stop_cv_.notify_all();
         if (self->loop_ != nullptr) {
             g_main_loop_quit(self->loop_);
         }
         return FALSE;
     case GST_MESSAGE_ERROR:
+        {
+            GError* error = nullptr;
+            gchar* debug = nullptr;
+            gst_message_parse_error(msg, &error, &debug);
+
+            std::lock_guard<std::mutex> lock(self->stop_mutex_);
+            self->eos_or_error_received_ = true;
+            self->stop_error_message_ = error != nullptr ? error->message : "unknown GStreamer error";
+
+            if (debug != nullptr) {
+                self->stop_error_message_ += " (";
+                self->stop_error_message_ += debug;
+                self->stop_error_message_ += ")";
+            }
+
+            if (error != nullptr) {
+                g_error_free(error);
+            }
+            if (debug != nullptr) {
+                g_free(debug);
+            }
+        }
+        self->stop_cv_.notify_all();
         if (self->loop_ != nullptr) {
             g_main_loop_quit(self->loop_);
         }

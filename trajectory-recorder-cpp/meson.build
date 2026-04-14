@@ -81,3 +81,21 @@ test(
     include_directories : test_inc_dir,
   ),
 )
+
+test(
+  'record_cli',
+  executable(
+    'record_cli_tests',
+    'tests/RecordCliTests.cpp',
+    include_directories : test_inc_dir,
+  ),
+)
+
+test(
+  'video_recorder_path',
+  executable(
+    'video_recorder_path_tests',
+    'tests/VideoRecorderPathTests.cpp',
+    include_directories : test_inc_dir,
+  ),
+)

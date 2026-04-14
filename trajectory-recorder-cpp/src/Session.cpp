@@ -34,6 +34,10 @@ void Session::Start() {
     video_recorder_->Start();
 }
 
+void Session::PumpEventsOnce() {
+    input_logger_->PumpEventsOnce();
+}
+
 void Session::Stop() {
     // Video stops first so the sync log is finalized before input capture exits.
     video_recorder_->Stop();

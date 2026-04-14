@@ -56,6 +56,7 @@ The runtime path for recording is:
 - initializes GStreamer with `gst_init`
 - installs console shutdown handlers
 - creates a `Session`
+- pumps SDL input events on the main thread while waiting for shutdown
 - blocks until Ctrl+C or another console shutdown event
 - calls `Session::Stop()`
 
@@ -83,6 +84,7 @@ It also creates the per-session output directory:
 Current lifecycle:
 
 - `Start()` starts `InputLogger` first, then `VideoRecorder`
+- `PumpEventsOnce()` forwards the main-thread SDL event pump to `InputLogger`
 - `Stop()` stops `VideoRecorder` first, then `InputLogger`
 
 The public header only forward-declares the owned classes to keep protobuf- and GStreamer-heavy dependencies out of the CLI compile boundary.
@@ -101,7 +103,7 @@ Current implementation details:
 - pipeline is built from a string in `BuildPipelineDescription()`
 - uses `d3d11screencapturesrc`
 - converts/scales to `1280x720` at `30 fps`
-- inserts `identity name=probe_point`
+- inserts `identity name=probe_point` as frame synchronization hook (identifier)
 - encodes with `x264enc`
 - writes `mp4`
 
@@ -120,7 +122,7 @@ Threading behavior:
 Resource-management notes:
 
 - GStreamer objects are managed manually with `gst_object_unref`
-- `Stop()` sends EOS, sets pipeline state to `NULL`, stops the main loop, joins the thread, and releases GStreamer resources
+- `Stop()` sends EOS, waits for EOS or ERROR on the bus so `mp4mux` can finalize the file, then sets the pipeline state to `NULL`, stops the main loop, joins the thread, and releases GStreamer resources
 
 ### `SyncLogger`
 
@@ -148,7 +150,7 @@ Files:
 - `include/InputLogger.hpp`
 - `src/InputLogger.cpp`
 
-`InputLogger` runs an SDL event loop on a worker thread and writes input snapshots to `actions.bin`.
+`InputLogger` runs SDL event polling on the main thread and writes input snapshots to `actions.bin`.
 
 Current input model:
 
@@ -172,6 +174,7 @@ Concurrency behavior:
 
 - internal state is protected by an SDL mutex
 - writing happens after a state snapshot is taken
+- SDL event pumping must stay on the main thread on Windows because SDL 3 asserts if `SDL_PollEvent()` runs off-thread
 
 Important current limitation:
 

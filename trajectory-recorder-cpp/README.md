@@ -96,6 +96,7 @@ After building, run the executables:
 - `convert_dataset <capture.mp4> <sync.csv> <actions.bin>`
 
 When running `record_session.exe` from PowerShell on Windows, use a Developer PowerShell and make sure the GStreamer runtime `bin` directory is on `PATH`. If Windows cannot load the GStreamer DLLs, the process can exit before `main()` starts and you will see no program output.
+The recorder also pumps SDL input events on the main thread. If that polling is moved to a worker thread, SDL 3 can raise assertion popups on Windows.
 
 Example:
 

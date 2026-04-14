@@ -18,6 +18,9 @@ public:
     // Starts input capture and video capture for the session directory.
     void Start();
 
+    // Pumps per-frame recorder work that must stay on the main thread.
+    void PumpEventsOnce();
+
     // Stops video first so frame logging closes before input capture shuts down.
     void Stop();
 

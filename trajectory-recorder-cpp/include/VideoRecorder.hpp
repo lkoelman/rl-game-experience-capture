@@ -2,7 +2,9 @@
 
 #include <gst/gst.h>
 
+#include <condition_variable>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -34,6 +36,10 @@ private:
     GstElement* pipeline_{nullptr};
     GMainLoop* loop_{nullptr};
     std::thread loop_thread_;
+    std::mutex stop_mutex_;
+    std::condition_variable stop_cv_;
+    bool eos_or_error_received_{false};
+    std::string stop_error_message_;
     bool started_{false};
 };
 

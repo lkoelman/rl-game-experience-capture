@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <fstream>
 #include <string>
-#include <thread>
 #include <unordered_set>
 
 #include "gamepad.pb.h"
@@ -19,16 +18,16 @@ public:
     explicit InputLogger(const std::string& output_path);
     ~InputLogger();
 
-    // Opens the output file, initializes SDL, and launches the event loop thread.
+    // Opens the output file and initializes SDL.
     void Start();
 
-    // Stops the worker, closes the controller handle, and shuts SDL down.
+    // Pumps pending SDL events on the calling thread and persists snapshots for input changes.
+    void PumpEventsOnce();
+
+    // Stops capture, closes the controller handle, and shuts SDL down.
     void Stop();
 
 private:
-    // Polls SDL events and writes a full state snapshot after each input mutation.
-    void EventLoop();
-
     // Serializes one protobuf snapshot as a little-endian length-prefixed record.
     void WriteState(const GamepadState& state);
 
@@ -38,7 +37,6 @@ private:
     std::string output_path_;
     std::ofstream out_bin_;
     std::atomic<bool> is_running_{false};
-    std::thread worker_thread_;
     mutable SDL_Mutex* state_mutex_{nullptr};
     SDL_Gamepad* gamepad_{nullptr};
     float axes_[SDL_GAMEPAD_AXIS_COUNT]{};

@@ -52,7 +52,72 @@ void InputLogger::Start() {
         throw std::runtime_error(SDL_GetError());
     }
 
-    worker_thread_ = std::thread(&InputLogger::EventLoop, this);
+}
+
+void InputLogger::PumpEventsOnce() {
+    if (!is_running_) {
+        return;
+    }
+
+    SDL_Event event;
+    bool saw_event = false;
+    while (SDL_PollEvent(&event)) {
+        saw_event = true;
+        bool state_changed = false;
+
+        SDL_LockMutex(state_mutex_);
+        switch (event.type) {
+        case SDL_EVENT_QUIT:
+            is_running_ = false;
+            break;
+        case SDL_EVENT_GAMEPAD_ADDED:
+            if (gamepad_ == nullptr) {
+                gamepad_ = SDL_OpenGamepad(event.gdevice.which);
+            }
+            break;
+        case SDL_EVENT_GAMEPAD_REMOVED:
+            if (gamepad_ != nullptr && SDL_GetGamepadID(gamepad_) == event.gdevice.which) {
+                SDL_CloseGamepad(gamepad_);
+                gamepad_ = nullptr;
+            }
+            break;
+        case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+            axes_[event.gaxis.axis] = static_cast<float>(event.gaxis.value) / 32767.0f;
+            state_changed = true;
+            break;
+        case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+            state_changed = pressed_buttons_.insert(event.gbutton.button).second;
+            break;
+        case SDL_EVENT_GAMEPAD_BUTTON_UP:
+            state_changed = pressed_buttons_.erase(event.gbutton.button) > 0;
+            break;
+        case SDL_EVENT_KEY_DOWN:
+            if (!event.key.repeat) {
+                state_changed = pressed_keys_.insert(event.key.scancode).second;
+            }
+            break;
+        case SDL_EVENT_KEY_UP:
+            state_changed = pressed_keys_.erase(event.key.scancode) > 0;
+            break;
+        default:
+            break;
+        }
+        GamepadState snapshot;
+        if (state_changed) {
+            // Persist a full snapshot after every input mutation so replay only needs timestamp lookup.
+            snapshot = SnapshotState(NowMonotonicNs());
+        }
+        SDL_UnlockMutex(state_mutex_);
+
+        if (state_changed) {
+            WriteState(snapshot);
+        }
+    }
+
+    if (!saw_event) {
+        // Yield when idle; this loop is event-driven rather than fixed-rate sampled.
+        SDL_Delay(1);
+    }
 }
 
 void InputLogger::Stop() {
@@ -60,9 +125,6 @@ void InputLogger::Stop() {
         return;
     }
 
-    if (worker_thread_.joinable()) {
-        worker_thread_.join();
-    }
     if (gamepad_ != nullptr) {
         SDL_CloseGamepad(gamepad_);
         gamepad_ = nullptr;
@@ -71,62 +133,6 @@ void InputLogger::Stop() {
         out_bin_.close();
     }
     SDL_QuitSubSystem(SDL_INIT_GAMEPAD | SDL_INIT_EVENTS);
-}
-
-void InputLogger::EventLoop() {
-    while (is_running_) {
-        SDL_Event event;
-        bool saw_event = false;
-        while (SDL_PollEvent(&event)) {
-            saw_event = true;
-            SDL_LockMutex(state_mutex_);
-            switch (event.type) {
-            case SDL_EVENT_QUIT:
-                is_running_ = false;
-                break;
-            case SDL_EVENT_GAMEPAD_ADDED:
-                if (gamepad_ == nullptr) {
-                    gamepad_ = SDL_OpenGamepad(event.gdevice.which);
-                }
-                break;
-            case SDL_EVENT_GAMEPAD_REMOVED:
-                if (gamepad_ != nullptr && SDL_GetGamepadID(gamepad_) == event.gdevice.which) {
-                    SDL_CloseGamepad(gamepad_);
-                    gamepad_ = nullptr;
-                }
-                break;
-            case SDL_EVENT_GAMEPAD_AXIS_MOTION:
-                axes_[event.gaxis.axis] = static_cast<float>(event.gaxis.value) / 32767.0f;
-                break;
-            case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
-                pressed_buttons_.insert(event.gbutton.button);
-                break;
-            case SDL_EVENT_GAMEPAD_BUTTON_UP:
-                pressed_buttons_.erase(event.gbutton.button);
-                break;
-            case SDL_EVENT_KEY_DOWN:
-                if (!event.key.repeat) {
-                    pressed_keys_.insert(event.key.scancode);
-                }
-                break;
-            case SDL_EVENT_KEY_UP:
-                pressed_keys_.erase(event.key.scancode);
-                break;
-            default:
-                break;
-            }
-
-            // Persist a full snapshot after every input mutation so replay only needs timestamp lookup.
-            const auto snapshot = SnapshotState(NowMonotonicNs());
-            SDL_UnlockMutex(state_mutex_);
-            WriteState(snapshot);
-        }
-
-        if (!saw_event) {
-            // Yield when idle; this loop is event-driven rather than fixed-rate sampled.
-            SDL_Delay(1);
-        }
-    }
 }
 
 void InputLogger::WriteState(const GamepadState& state) {
