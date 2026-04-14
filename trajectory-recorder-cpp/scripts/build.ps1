@@ -1,7 +1,7 @@
 param(
     [string]$BuildDir = "builddir",
     [string]$BuildType = "debug",
-    [string]$GStreamerRoot = "C:\gstreamer\1.0\msvc_x86_64"
+    [string]$GStreamerRoot = "C:\Program Files\gstreamer\1.0\msvc_x86_64"
 )
 
 $ErrorActionPreference = "Stop"
