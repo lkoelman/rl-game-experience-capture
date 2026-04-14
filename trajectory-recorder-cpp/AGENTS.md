@@ -63,16 +63,14 @@
 - Trust framework guarantees
 - Don't use feature flags or backwards-compatibility shims when you can just change the code
 
+### Read Documentation
+
+Before making non-trivial changes, read ARCHITECTURE.md and README.md files for the components you are working on.
+
 ## Git Conventions
 
-**Commit messages:**
-- Imperative mood (e.g., "Fix bug in X", not "Fixed bug" or "Fixes bug")
-- Descriptive and concise
-- Include python module scope when helpful (e.g., `pretraining: fix data loaders`)
-- No strict conventional-commits requirement
-
 **Commit workflow:**
-- Claude proposes commit messages; user retains final edit/approval
+- Agent proposes commit messages; user retains final edit/approval
 - **NEVER commit, push, or run destructive git commands without explicit user permission**
 - **NEVER update git config without explicit user permission**
 - **NEVER run force push, hard reset, or other destructive git operations without explicit user approval**
@@ -93,6 +91,12 @@ When modifying code, check if these docs need updates:
 - API changes: update module README and architecture docs
 - Build/test changes: update this AGENTS.md or module-specific docs
 - Deprecations: mark as deprecated in docs, add migration guide if needed
+
+**Writing docstrings**
+Only write docstrings for non-trivial components.
+Be concise, specific, and value dense. Write so that a new developer can understand the code and easily tie it back to the system architecture, i.e. to its role in the larger system context.
+Docstrings should expres intent, role in system context, and side effects.
+Class docstrings should also document fields and their intent.
 
 **Before committing**, ask: "Did I update the docs?"
 
