@@ -188,14 +188,12 @@ std::optional<std::string> PromptForReviewAction(const MappingWorkflowState& wor
 // Materializes the final mapping profile payload from the completed workflow state.
 ActionMappingProfile BuildProfile(const GameDefinition& game,
                                   const std::string& class_id,
-                                  const std::string& spec_id,
                                   const std::string& profile_name,
                                   const MappingWorkflowState& workflow) {
     ActionMappingProfile profile;
     profile.schema_version = 1;
     profile.game_id = game.game_id;
     profile.class_id = class_id;
-    profile.spec_id = spec_id;
     profile.profile_name = profile_name;
     profile.created_at = CurrentTimestampUtc();
     profile.updated_at = profile.created_at;
@@ -222,21 +220,7 @@ std::optional<ActionMappingProfile> RunMappingWorkflow(const GameDefinition& gam
     }
 
     const ClassDefinition& klass = game.classes[*class_selection];
-    std::string spec_id;
-    if (!klass.specializations.empty()) {
-        std::vector<std::string> spec_labels;
-        spec_labels.reserve(klass.specializations.size());
-        for (const auto& spec : klass.specializations) {
-            spec_labels.push_back(spec.label + " (" + spec.id + ")");
-        }
-        const auto spec_selection = PromptForSelection("Select a specialization", spec_labels);
-        if (!spec_selection.has_value()) {
-            return std::nullopt;
-        }
-        spec_id = klass.specializations[*spec_selection].id;
-    }
-
-    MappingWorkflowState workflow(CollectActions(game, klass.id, spec_id));
+    MappingWorkflowState workflow(CollectActions(game, klass.id));
     while (!workflow.IsFinished()) {
         if (!RunActionCaptureScreen(workflow, capture)) {
             return std::nullopt;
@@ -253,7 +237,7 @@ std::optional<ActionMappingProfile> RunMappingWorkflow(const GameDefinition& gam
             return std::nullopt;
         }
         if (review_selection->empty()) {
-            return BuildProfile(game, klass.id, spec_id, profile_name, workflow);
+            return BuildProfile(game, klass.id, profile_name, workflow);
         }
         if (!workflow.SetCurrentActionById(*review_selection)) {
             throw std::runtime_error("failed to select action for review: " + *review_selection);

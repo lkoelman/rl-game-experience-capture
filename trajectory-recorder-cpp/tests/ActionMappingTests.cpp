@@ -25,24 +25,19 @@ trajectory::mapping::GameDefinition BuildGameDefinition() {
     klass.label = "Mage";
     klass.actions.push_back(ActionDefinition{"jump", "Jump", "", ActionInputKind::digital, true});
     klass.actions.push_back(ActionDefinition{"move_x", "Move X", "", ActionInputKind::analog, true});
-
-    SpecializationDefinition spec;
-    spec.id = "fire";
-    spec.label = "Fire";
-    spec.actions.push_back(ActionDefinition{"cast_fireball", "Cast Fireball", "", ActionInputKind::digital, true});
-    klass.specializations.push_back(spec);
+    klass.actions.push_back(ActionDefinition{"cast_fireball", "Cast Fireball", "", ActionInputKind::digital, true});
 
     game.classes.push_back(klass);
     return game;
 }
 
-void TestCollectActionsIncludesClassAndSpecActions() {
+void TestCollectActionsReturnsClassActions() {
     const auto game = BuildGameDefinition();
-    const auto actions = trajectory::mapping::CollectActions(game, "mage", "fire");
+    const auto actions = trajectory::mapping::CollectActions(game, "mage");
 
-    Expect(actions.size() == 3, "class and specialization actions should be combined");
+    Expect(actions.size() == 3, "class actions should be returned in order");
     Expect(actions[0].id == "jump", "class actions should remain available");
-    Expect(actions[2].id == "cast_fireball", "specialization actions should be appended");
+    Expect(actions[2].id == "cast_fireball", "later class actions should remain available");
 }
 
 void TestValidationFindsDuplicateBindingsAcrossActions() {
@@ -51,7 +46,6 @@ void TestValidationFindsDuplicateBindingsAcrossActions() {
     trajectory::mapping::ActionMappingProfile profile;
     profile.game_id = "demo";
     profile.class_id = "mage";
-    profile.spec_id = "fire";
     profile.profile_name = "default";
     profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Button("south")}});
     profile.actions.push_back({"cast_fireball", false, {trajectory::mapping::ActionBinding::Button("south")}});
@@ -75,7 +69,6 @@ void TestValidationFindsMissingRequiredActions() {
     trajectory::mapping::ActionMappingProfile profile;
     profile.game_id = "demo";
     profile.class_id = "mage";
-    profile.spec_id = "fire";
     profile.profile_name = "default";
     profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Button("south")}});
 
@@ -87,7 +80,7 @@ void TestValidationFindsMissingRequiredActions() {
 
 void TestWorkflowSupportsSkipConfirmAndEdit() {
     const auto game = BuildGameDefinition();
-    trajectory::mapping::MappingWorkflowState workflow(trajectory::mapping::CollectActions(game, "mage", "fire"));
+    trajectory::mapping::MappingWorkflowState workflow(trajectory::mapping::CollectActions(game, "mage"));
 
     workflow.AddBindingToCurrentAction(trajectory::mapping::ActionBinding::Button("south"));
     workflow.AdvanceAction();
@@ -110,7 +103,7 @@ void TestWorkflowSupportsSkipConfirmAndEdit() {
 
 int main() {
     trajectory::test_support::DisableWindowsErrorDialogs();
-    TestCollectActionsIncludesClassAndSpecActions();
+    TestCollectActionsReturnsClassActions();
     TestValidationFindsDuplicateBindingsAcrossActions();
     TestValidationFindsMissingRequiredActions();
     TestWorkflowSupportsSkipConfirmAndEdit();

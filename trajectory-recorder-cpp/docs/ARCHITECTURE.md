@@ -385,7 +385,7 @@ Files:
 
 Responsibilities:
 
-- represent game action definitions grouped by class and specialization
+- represent game action definitions grouped by class
 - represent per-user mapping profiles
 - represent binding variants for buttons, analog axes, and thresholded triggers
 - validate game definitions and mapping profiles
@@ -431,7 +431,7 @@ Files:
 
 Responsibilities:
 
-- prompt for class and specialization selection
+- prompt for class selection
 - guide the user through action-by-action mapping with FTXUI
 
 ## Dependency Boundaries

@@ -182,7 +182,7 @@ Examples:
 
 The mapper currently:
 
-- loads a YAML game definition grouped by class and specialization
-- uses an FTXUI terminal workflow to select class/spec and walk action-by-action through mappings
+- loads a YAML game definition grouped by class
+- uses an FTXUI terminal workflow to select a class and walk action-by-action through mappings
 - captures gamepad buttons, joystick axes, and trigger thresholds through SDL3
 - writes `action-mapping.yaml` as a per-user profile keyed by stable action IDs

@@ -35,19 +35,15 @@ void TestGameDefinitionParsesFromYaml() {
         "        label: Jump\n"
         "        kind: digital\n"
         "        required: true\n"
-        "    specializations:\n"
-        "      - id: fire\n"
-        "        label: Fire\n"
-        "        actions:\n"
-        "          - id: cast_fireball\n"
-        "            label: Cast Fireball\n"
-        "            kind: digital\n");
+        "      - id: cast_fireball\n"
+        "        label: Cast Fireball\n"
+        "        kind: digital\n");
 
     const auto game = trajectory::mapping::LoadGameDefinition(path.string());
 
     Expect(game.game_id == "demo", "game id should parse");
     Expect(game.classes.size() == 1, "class list should parse");
-    Expect(game.classes[0].specializations.size() == 1, "specialization list should parse");
+    Expect(game.classes[0].actions.size() == 2, "class actions should parse");
 }
 
 void TestProfileRoundTripsToYaml() {
@@ -55,7 +51,6 @@ void TestProfileRoundTripsToYaml() {
     profile.schema_version = 1;
     profile.game_id = "demo";
     profile.class_id = "mage";
-    profile.spec_id = "fire";
     profile.profile_name = "steam-deck";
     profile.complete = true;
     profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Button("south")}});

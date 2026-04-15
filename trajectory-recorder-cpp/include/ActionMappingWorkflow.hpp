@@ -9,7 +9,7 @@ namespace trajectory::mapping {
 
 class GamepadBindingCapture;
 
-// Runs the interactive class/spec selection and per-action mapping flow.
+// Runs the interactive class selection and per-action mapping flow.
 // Returns `std::nullopt` when the operator cancels before saving.
 std::optional<ActionMappingProfile> RunMappingWorkflow(const GameDefinition& game,
                                                        GamepadBindingCapture& capture,

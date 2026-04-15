@@ -123,25 +123,6 @@ GameDefinition LoadGameDefinition(const std::string& path) {
         klass.label = class_node["label"].as<std::string>();
         klass.actions = ParseActionList(class_node["actions"], "classes[" + std::to_string(class_index) + "].actions");
 
-        const YAML::Node specs_node = class_node["specializations"];
-        if (specs_node) {
-            if (!specs_node.IsSequence()) {
-                throw std::runtime_error("classes[" + std::to_string(class_index) + "].specializations must be a sequence");
-            }
-            for (std::size_t spec_index = 0; spec_index < specs_node.size(); ++spec_index) {
-                const YAML::Node spec_node = specs_node[spec_index];
-                if (!spec_node["id"] || !spec_node["label"]) {
-                    throw std::runtime_error("specializations entries must contain id and label");
-                }
-
-                SpecializationDefinition spec;
-                spec.id = spec_node["id"].as<std::string>();
-                spec.label = spec_node["label"].as<std::string>();
-                spec.actions = ParseActionList(spec_node["actions"], "specializations[" + std::to_string(spec_index) + "].actions");
-                klass.specializations.push_back(std::move(spec));
-            }
-        }
-
         game.classes.push_back(std::move(klass));
     }
 
@@ -159,7 +140,6 @@ ActionMappingProfile LoadActionMappingProfile(const std::string& path) {
     profile.schema_version = root["schema_version"] ? root["schema_version"].as<int>() : 1;
     profile.game_id = root["game_id"] ? root["game_id"].as<std::string>() : "";
     profile.class_id = root["class_id"] ? root["class_id"].as<std::string>() : "";
-    profile.spec_id = root["spec_id"] ? root["spec_id"].as<std::string>() : "";
     profile.profile_name = root["profile_name"] ? root["profile_name"].as<std::string>() : "";
     profile.created_at = root["created_at"] ? root["created_at"].as<std::string>() : "";
     profile.updated_at = root["updated_at"] ? root["updated_at"].as<std::string>() : "";
@@ -196,9 +176,6 @@ void SaveActionMappingProfile(const ActionMappingProfile& profile, const std::st
     out << YAML::Key << "schema_version" << YAML::Value << profile.schema_version;
     out << YAML::Key << "game_id" << YAML::Value << profile.game_id;
     out << YAML::Key << "class_id" << YAML::Value << profile.class_id;
-    if (!profile.spec_id.empty()) {
-        out << YAML::Key << "spec_id" << YAML::Value << profile.spec_id;
-    }
     out << YAML::Key << "profile_name" << YAML::Value << profile.profile_name;
     if (!profile.created_at.empty()) {
         out << YAML::Key << "created_at" << YAML::Value << profile.created_at;

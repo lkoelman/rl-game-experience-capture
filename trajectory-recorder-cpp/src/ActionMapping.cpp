@@ -92,31 +92,13 @@ const ClassDefinition* FindClassDefinition(const GameDefinition& game, const std
     return nullptr;
 }
 
-const SpecializationDefinition* FindSpecializationDefinition(const ClassDefinition& klass, const std::string& spec_id) {
-    for (const auto& spec : klass.specializations) {
-        if (spec.id == spec_id) {
-            return &spec;
-        }
-    }
-    return nullptr;
-}
-
-std::vector<ActionDefinition> CollectActions(const GameDefinition& game, const std::string& class_id, const std::string& spec_id) {
+std::vector<ActionDefinition> CollectActions(const GameDefinition& game, const std::string& class_id) {
     const ClassDefinition* klass = FindClassDefinition(game, class_id);
     if (klass == nullptr) {
         throw std::runtime_error("unknown class id: " + class_id);
     }
 
-    std::vector<ActionDefinition> actions = klass->actions;
-    if (!spec_id.empty()) {
-        const SpecializationDefinition* spec = FindSpecializationDefinition(*klass, spec_id);
-        if (spec == nullptr) {
-            throw std::runtime_error("unknown specialization id: " + spec_id);
-        }
-        actions.insert(actions.end(), spec->actions.begin(), spec->actions.end());
-    }
-
-    return actions;
+    return klass->actions;
 }
 
 ValidationResult ValidateGameDefinition(const GameDefinition& game) {
@@ -141,19 +123,6 @@ ValidationResult ValidateGameDefinition(const GameDefinition& game) {
             }
         }
 
-        std::unordered_set<std::string> spec_ids;
-        for (const auto& spec : klass.specializations) {
-            if (spec.id.empty()) {
-                AddIssue(result, ValidationSeverity::error, "", "specialization id must not be empty");
-            } else if (!spec_ids.insert(spec.id).second) {
-                AddIssue(result, ValidationSeverity::error, spec.id, "duplicate specialization id: " + spec.id);
-            }
-            for (const auto& action : spec.actions) {
-                if (!action_ids.insert(action.id).second) {
-                    AddIssue(result, ValidationSeverity::error, action.id, "duplicate action id: " + action.id);
-                }
-            }
-        }
     }
 
     return result;
@@ -173,12 +142,7 @@ ValidationResult ValidateProfile(const GameDefinition& game, const ActionMapping
         return result;
     }
 
-    if (!profile.spec_id.empty() && FindSpecializationDefinition(*klass, profile.spec_id) == nullptr) {
-        AddIssue(result, ValidationSeverity::error, "", "unknown specialization id in profile: " + profile.spec_id);
-        return result;
-    }
-
-    const auto applicable_actions = CollectActions(game, profile.class_id, profile.spec_id);
+    const auto applicable_actions = CollectActions(game, profile.class_id);
     std::unordered_map<std::string, ActionDefinition> action_lookup;
     for (const auto& action : applicable_actions) {
         action_lookup.emplace(action.id, action);
