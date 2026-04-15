@@ -9,6 +9,7 @@ cpp = meson.get_compiler('cpp')
 protobuf_dep = dependency('protobuf')
 sdl3_dep = dependency('sdl')
 ftxui_dep = dependency('ftxui')
+yamlcpp_dep = dependency('yaml-cpp')
 
 gst_root = meson.get_external_property('gstreamer_root', '')
 if gst_root == ''
@@ -57,6 +58,18 @@ core_lib = static_library(
   dependencies : [gst_dep, gst_app_dep, sdl3_dep, protobuf_dep],
 )
 
+mapping_lib = static_library(
+  'mapping_core',
+  [
+    'src/ActionMapping.cpp',
+    'src/ActionMappingYaml.cpp',
+    'src/ActionMappingWorkflow.cpp',
+    'src/GamepadBindingCapture.cpp',
+  ],
+  include_directories : inc_dir,
+  dependencies : [sdl3_dep, ftxui_dep, yamlcpp_dep],
+)
+
 executable(
   'record_session',
   [
@@ -85,6 +98,14 @@ executable(
   include_directories : inc_dir,
   link_with : validator_lib,
   dependencies : [protobuf_dep],
+)
+
+executable(
+  'map_actions',
+  'src/main_map_actions.cpp',
+  include_directories : inc_dir,
+  link_with : mapping_lib,
+  dependencies : [sdl3_dep, ftxui_dep, yamlcpp_dep],
 )
 
 # Requires OpenCV
@@ -168,5 +189,41 @@ test(
     generated_protos,
     include_directories : inc_dir,
     dependencies : [protobuf_dep],
+  ),
+)
+
+test(
+  'map_cli',
+  executable(
+    'map_cli_tests',
+    'tests/MapCliTests.cpp',
+    include_directories : test_inc_dir,
+  ),
+)
+
+test(
+  'action_mapping',
+  executable(
+    'action_mapping_tests',
+    [
+      'tests/ActionMappingTests.cpp',
+      'src/ActionMapping.cpp',
+    ],
+    include_directories : inc_dir,
+    dependencies : [yamlcpp_dep],
+  ),
+)
+
+test(
+  'action_mapping_yaml',
+  executable(
+    'action_mapping_yaml_tests',
+    [
+      'tests/ActionMappingYamlTests.cpp',
+      'src/ActionMapping.cpp',
+      'src/ActionMappingYaml.cpp',
+    ],
+    include_directories : inc_dir,
+    dependencies : [yamlcpp_dep],
   ),
 )

@@ -13,6 +13,7 @@ The package records a gameplay session as three synchronized artifacts:
 The intended downstream use is reinforcement-learning dataset construction from aligned `(frame, action)` pairs.
 
 The project also includes an offline validation path for checking recorded session completeness and inspecting frame-to-input alignment.
+It now also includes a gamepad action mapping path for defining how low-level controller inputs map to high-level in-game actions.
 
 ## Top-Level Structure
 
@@ -20,6 +21,7 @@ The project also includes an offline validation path for checking recorded sessi
 - `src/`: implementation files and CLI entrypoints
 - `protos/`: protobuf schema and Meson generation rules
 - `tests/`: unit tests for deterministic helper code
+- `specs/`: PRDs and implementation plans
 - `scripts/build.ps1`: canonical Windows build entrypoint
 - `docs/ARCHITECTURE.md`: this file
 
@@ -29,7 +31,7 @@ The project builds with Conan + Meson + Ninja on Windows.
 
 Key points:
 
-- Conan manages `protobuf`, `sdl`, and `ftxui`; OpenCV is currently commented out in `conanfile.txt`.
+- Conan manages `protobuf`, `sdl`, `ftxui`, and `yaml-cpp`; OpenCV is currently commented out in `conanfile.txt`.
 - GStreamer is not consumed through Conan. The build uses an existing Windows GStreamer installation root.
 - `scripts/build.ps1` is the canonical build path. It:
   - validates the GStreamer root
@@ -360,6 +362,78 @@ Consumed by:
 
 - `TrajectoryReplayer`
 
+## Runtime Architecture: Action Mapping
+
+The runtime path for action mapping is:
+
+1. `src/main_map_actions.cpp`
+2. `trajectory::map_cli`
+3. `trajectory::mapping::LoadGameDefinition()`
+4. `trajectory::mapping::GamepadBindingCapture`
+5. `trajectory::mapping::RunMappingWorkflow()`
+6. `trajectory::mapping::ValidateProfile()`
+7. `trajectory::mapping::SaveActionMappingProfile()`
+
+This path is intentionally separate from recording and validation. It produces configuration, not captured session artifacts.
+
+### Mapping Domain Model
+
+Files:
+
+- `include/ActionMapping.hpp`
+- `src/ActionMapping.cpp`
+
+Responsibilities:
+
+- represent game action definitions grouped by class and specialization
+- represent per-user mapping profiles
+- represent binding variants for buttons, analog axes, and thresholded triggers
+- validate game definitions and mapping profiles
+- provide a deterministic workflow state model for tests and the TUI flow
+
+### YAML Mapping IO
+
+Files:
+
+- `include/ActionMappingYaml.hpp`
+- `src/ActionMappingYaml.cpp`
+
+Responsibilities:
+
+- load `game-actions.yaml`
+- load/write `action-mapping.yaml`
+- enforce the expected YAML structure and binding field semantics
+
+### Gamepad Binding Capture
+
+Files:
+
+- `include/GamepadBindingCapture.hpp`
+- `src/GamepadBindingCapture.cpp`
+
+Responsibilities:
+
+- convert SDL gamepad events into stable binding names used in YAML profiles
+
+Important current behavior:
+
+- digital actions accept gamepad buttons
+- analog actions accept joystick axes and currently store them as explicit per-axis bindings
+- trigger actions store a threshold derived from the observed trigger press
+
+### Mapping Workflow
+
+Files:
+
+- `include/ActionMappingWorkflow.hpp`
+- `src/ActionMappingWorkflow.cpp`
+- `include/MapCli.hpp`
+
+Responsibilities:
+
+- prompt for class and specialization selection
+- guide the user through action-by-action mapping with FTXUI
+
 ## Dependency Boundaries
 
 Current external library usage is intentionally concentrated:
@@ -479,5 +553,6 @@ At the moment, the actively supported built executable is:
 
 - `record_session`
 - `validate_recording`
+- `map_actions`
 
 `convert_dataset` is present in source but not currently enabled in the build.

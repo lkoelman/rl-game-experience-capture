@@ -11,6 +11,7 @@ C++20 scaffold for recording synchronized gameplay trajectories as video frames 
 - Protobuf for action serialization
 - OpenCV for offline replay
 - FTXUI for TUI
+- yaml-cpp for mapping config IO
 
 ## Layout
 
@@ -18,6 +19,7 @@ C++20 scaffold for recording synchronized gameplay trajectories as video frames 
 - `src/` implementation and CLI entrypoints
 - `protos/` protobuf schema and Meson generation rules
 - `tests/` no-dependency unit tests for binary framing helpers
+- `specs/` product and implementation specs
 - `scripts/build.ps1` helper to run Conan, Meson, and tests
 
 ## Dependency installation
@@ -113,6 +115,7 @@ After building, run the executables:
 
 - `record_session [output_dir] [session_name]`
 - `validate_recording <session_dir|sessions_root>`
+- `map_actions <game-actions.yaml> [action-mapping.yaml]`
 - `convert_dataset <capture.mp4> <sync.csv> <actions.bin>`
 
 `record_session` now supports pre-recording capture selection:
@@ -167,3 +170,19 @@ The validator currently:
 - parses `sync.csv` and `actions.bin`
 - reports timing, dead-period, idle-gap, and input-frequency statistics
 - supports summary, JSON, CSV, and text-based step-through modes
+
+`map_actions` builds a per-user mapping between raw gamepad inputs and in-game action IDs defined in a YAML game definition file.
+
+Examples:
+
+```powershell
+.\builddir\map_actions.exe .\configs\game-actions.yaml
+.\builddir\map_actions.exe .\configs\game-actions.yaml .\profiles\action-mapping.yaml --profile-name "steam-deck"
+```
+
+The mapper currently:
+
+- loads a YAML game definition grouped by class and specialization
+- uses an FTXUI terminal workflow to select class/spec and walk action-by-action through mappings
+- captures gamepad buttons, joystick axes, and trigger thresholds through SDL3
+- writes `action-mapping.yaml` as a per-user profile keyed by stable action IDs
