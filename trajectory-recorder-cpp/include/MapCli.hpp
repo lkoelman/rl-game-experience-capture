@@ -8,12 +8,14 @@
 
 namespace trajectory::map_cli {
 
+// Parsed command-line options for the standalone `map_actions` executable.
 struct Options {
     std::string game_definition_path;
     std::string output_path = "action-mapping.yaml";
     std::string profile_name = "default";
 };
 
+// Returns true when the input contains at least one non-whitespace character.
 inline bool HasNonWhitespace(std::string_view value) {
     for (const unsigned char ch : value) {
         if (!std::isspace(ch)) {
@@ -23,11 +25,13 @@ inline bool HasNonWhitespace(std::string_view value) {
     return false;
 }
 
+// Builds the mapper CLI usage string used in validation failures.
 inline std::string BuildUsage(std::string_view program_name) {
     return "Usage: " + std::string(program_name) +
            " <game-actions.yaml> [action-mapping.yaml] [--profile-name <name>]";
 }
 
+// Parses mapper CLI arguments, applies defaults, and emits usage on invalid input.
 inline bool TryParseArguments(const std::vector<std::string>& args,
                               std::string_view program_name,
                               Options& options,

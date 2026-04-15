@@ -19,6 +19,7 @@ namespace trajectory::mapping {
 
 namespace {
 
+// Formats a UTC timestamp for profile metadata written during save.
 std::string CurrentTimestampUtc() {
     const auto now = std::chrono::system_clock::now();
     const std::time_t time = std::chrono::system_clock::to_time_t(now);
@@ -33,6 +34,7 @@ std::string CurrentTimestampUtc() {
     return formatted.str();
 }
 
+// Presents a simple selectable list in the terminal and returns the chosen index.
 std::optional<std::size_t> PromptForSelection(const std::string& title, const std::vector<std::string>& labels) {
     if (labels.empty()) {
         return std::nullopt;
@@ -75,6 +77,7 @@ std::optional<std::size_t> PromptForSelection(const std::string& title, const st
     return static_cast<std::size_t>(selected);
 }
 
+// Runs the per-action capture screen until the operator confirms, skips, or cancels.
 bool RunActionCaptureScreen(MappingWorkflowState& workflow, GamepadBindingCapture& capture) {
     bool done = false;
     bool cancelled = false;
@@ -158,6 +161,7 @@ bool RunActionCaptureScreen(MappingWorkflowState& workflow, GamepadBindingCaptur
     return done && !cancelled;
 }
 
+// Presents the review screen and returns either save, cancel, or the selected action id.
 std::optional<std::string> PromptForReviewAction(const MappingWorkflowState& workflow) {
     std::vector<std::string> labels;
     labels.reserve(workflow.ActionStates().size() + 2);
@@ -181,6 +185,7 @@ std::optional<std::string> PromptForReviewAction(const MappingWorkflowState& wor
     return workflow.ActionStates()[*selection - 2].action_id;
 }
 
+// Materializes the final mapping profile payload from the completed workflow state.
 ActionMappingProfile BuildProfile(const GameDefinition& game,
                                   const std::string& class_id,
                                   const std::string& spec_id,

@@ -9,6 +9,7 @@ namespace trajectory::mapping {
 
 namespace {
 
+// Parses the YAML action kind token into the mapper's internal enum.
 ActionInputKind ParseActionInputKind(const YAML::Node& node, const std::string& path) {
     const std::string value = node.as<std::string>();
     if (value == "digital") {
@@ -23,6 +24,7 @@ ActionInputKind ParseActionInputKind(const YAML::Node& node, const std::string& 
     throw std::runtime_error(path + " must be one of: digital, analog, trigger");
 }
 
+// Parses one action definition node from the game catalog.
 ActionDefinition ParseActionDefinition(const YAML::Node& node, const std::string& path) {
     if (!node["id"] || !node["label"] || !node["kind"]) {
         throw std::runtime_error(path + " must contain id, label, and kind");
@@ -37,6 +39,7 @@ ActionDefinition ParseActionDefinition(const YAML::Node& node, const std::string
     return action;
 }
 
+// Parses an action list while preserving catalog order for the mapper workflow.
 std::vector<ActionDefinition> ParseActionList(const YAML::Node& node, const std::string& path) {
     std::vector<ActionDefinition> actions;
     if (!node) {
@@ -51,6 +54,7 @@ std::vector<ActionDefinition> ParseActionList(const YAML::Node& node, const std:
     return actions;
 }
 
+// Parses one saved low-level binding entry from an action mapping profile.
 ActionBinding ParseBinding(const YAML::Node& node, const std::string& path) {
     if (!node["type"] || !node["control"]) {
         throw std::runtime_error(path + " must contain type and control");
@@ -78,6 +82,7 @@ ActionBinding ParseBinding(const YAML::Node& node, const std::string& path) {
     throw std::runtime_error(path + " has unknown binding type: " + type);
 }
 
+// Returns the stable YAML token for a serialized binding type.
 std::string BindingTypeName(BindingType type) {
     switch (type) {
     case BindingType::button:

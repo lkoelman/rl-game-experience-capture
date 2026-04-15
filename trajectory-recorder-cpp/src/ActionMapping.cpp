@@ -10,6 +10,7 @@ namespace trajectory::mapping {
 
 namespace {
 
+// Returns the button names that may appear in mapping profiles.
 const std::unordered_set<std::string>& ValidButtons() {
     static const std::unordered_set<std::string> controls{
         "south",         "east",          "west",           "north",        "back",
@@ -21,20 +22,24 @@ const std::unordered_set<std::string>& ValidButtons() {
     return controls;
 }
 
+// Returns the analog axis names accepted for joystick-backed mappings.
 const std::unordered_set<std::string>& ValidAxes() {
     static const std::unordered_set<std::string> controls{"leftx", "lefty", "rightx", "righty"};
     return controls;
 }
 
+// Returns the trigger axis names accepted for threshold-based bindings.
 const std::unordered_set<std::string>& ValidTriggers() {
     static const std::unordered_set<std::string> controls{"left_trigger", "right_trigger"};
     return controls;
 }
 
+// Validates the serialized axis direction token used in YAML profiles.
 bool IsValidDirection(const std::string& direction) {
     return direction == "negative" || direction == "positive" || direction == "any";
 }
 
+// Canonicalizes a binding into the key used for duplicate/conflict detection.
 std::string BindingConflictKey(const ActionBinding& binding) {
     switch (binding.type) {
     case BindingType::button:
@@ -47,6 +52,7 @@ std::string BindingConflictKey(const ActionBinding& binding) {
     return {};
 }
 
+// Appends a validation issue and marks the aggregate result as not fully clean.
 void AddIssue(ValidationResult& result, ValidationSeverity severity, std::string action_id, std::string message) {
     result.ok = false;
     result.issues.push_back(ValidationIssue{severity, std::move(action_id), std::move(message)});

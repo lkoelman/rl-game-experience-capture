@@ -10,11 +10,13 @@ namespace trajectory::mapping {
 
 namespace {
 
+// Normalizes SDL axis values into the mapper's expected [-1, 1] range.
 float NormalizeAxisValue(Sint16 value) {
     const float normalized = static_cast<float>(value) / 32767.0f;
     return std::clamp(normalized, -1.0f, 1.0f);
 }
 
+// Converts SDL button enums into the stable YAML control names used by profiles.
 std::string ButtonControlName(SDL_GamepadButton button) {
     switch (button) {
     case SDL_GAMEPAD_BUTTON_SOUTH:
@@ -64,6 +66,7 @@ std::string ButtonControlName(SDL_GamepadButton button) {
     }
 }
 
+// Converts SDL axis enums into the stable YAML control names used by profiles.
 std::string AxisControlName(SDL_GamepadAxis axis) {
     switch (axis) {
     case SDL_GAMEPAD_AXIS_LEFTX:
@@ -83,11 +86,13 @@ std::string AxisControlName(SDL_GamepadAxis axis) {
     }
 }
 
+// Identifies joystick axes that should map to analog action bindings.
 bool IsAnalogAxis(SDL_GamepadAxis axis) {
     return axis == SDL_GAMEPAD_AXIS_LEFTX || axis == SDL_GAMEPAD_AXIS_LEFTY ||
            axis == SDL_GAMEPAD_AXIS_RIGHTX || axis == SDL_GAMEPAD_AXIS_RIGHTY;
 }
 
+// Identifies trigger axes that should map to threshold-based trigger bindings.
 bool IsTriggerAxis(SDL_GamepadAxis axis) {
     return axis == SDL_GAMEPAD_AXIS_LEFT_TRIGGER || axis == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER;
 }
