@@ -2,6 +2,7 @@
 #include <string>
 
 #include "InputLogger.hpp"
+#include "TestWindowsSetup.hpp"
 
 namespace {
 
@@ -42,6 +43,7 @@ void TestFormatVerboseStateHandlesEmptyCollections() {
 }  // namespace
 
 int main() {
+    trajectory::test_support::DisableWindowsErrorDialogs();
     TestFormatVerboseStateIncludesAllFields();
     TestFormatVerboseStateHandlesEmptyCollections();
     return 0;

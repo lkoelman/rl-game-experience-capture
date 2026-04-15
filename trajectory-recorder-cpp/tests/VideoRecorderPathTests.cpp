@@ -2,6 +2,7 @@
 #include <string>
 
 #include "CaptureTarget.hpp"
+#include "TestWindowsSetup.hpp"
 #include "VideoRecorderPipeline.hpp"
 
 namespace {
@@ -51,6 +52,7 @@ void TestWindowTargetUsesWindowHandleProperty() {
 }  // namespace
 
 int main() {
+    trajectory::test_support::DisableWindowsErrorDialogs();
     TestWindowsPathUsesForwardSlashes();
     TestPipelineUsesNormalizedFilesinkPath();
     TestMonitorTargetUsesMonitorIndexProperty();

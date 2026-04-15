@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "CaptureSelection.hpp"
+#include "TestWindowsSetup.hpp"
 
 namespace {
 
@@ -117,6 +118,7 @@ void TestPageBuildsNumericShortcutSlice() {
 }  // namespace
 
 int main() {
+    trajectory::test_support::DisableWindowsErrorDialogs();
     TestMonitorIdResolvesToZeroBasedIndex();
     TestUnknownMonitorIdFailsClearly();
     TestWindowQueryMatchesCaseInsensitiveSubstring();

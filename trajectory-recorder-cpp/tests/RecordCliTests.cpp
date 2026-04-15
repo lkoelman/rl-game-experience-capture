@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "RecordCli.hpp"
+#include "TestWindowsSetup.hpp"
 
 namespace {
 
@@ -171,6 +172,7 @@ void TestUsageIncludesCaptureFlags() {
 }  // namespace
 
 int main() {
+    trajectory::test_support::DisableWindowsErrorDialogs();
     TestDefaultsAreApplied();
     TestTooManyArgumentsFailsClearly();
     TestBlankSessionNameFailsClearly();

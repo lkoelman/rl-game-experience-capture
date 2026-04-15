@@ -4,6 +4,7 @@
 #include <string>
 
 #include "BinaryIO.hpp"
+#include "TestWindowsSetup.hpp"
 
 namespace {
 
@@ -41,6 +42,7 @@ void TestShortReadThrows() {
 }  // namespace
 
 int main() {
+    trajectory::test_support::DisableWindowsErrorDialogs();
     TestUint32RoundTrip();
     TestLengthPrefixedRoundTrip();
     TestShortReadThrows();

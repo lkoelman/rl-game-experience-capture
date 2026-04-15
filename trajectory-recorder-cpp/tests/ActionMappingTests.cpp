@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "ActionMapping.hpp"
+#include "TestWindowsSetup.hpp"
 
 namespace {
 
@@ -108,6 +109,7 @@ void TestWorkflowSupportsSkipConfirmAndEdit() {
 }  // namespace
 
 int main() {
+    trajectory::test_support::DisableWindowsErrorDialogs();
     TestCollectActionsIncludesClassAndSpecActions();
     TestValidationFindsDuplicateBindingsAcrossActions();
     TestValidationFindsMissingRequiredActions();

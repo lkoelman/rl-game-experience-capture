@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "MapCli.hpp"
+#include "TestWindowsSetup.hpp"
 
 namespace {
 
@@ -74,6 +75,7 @@ void TestBlankProfileNameFailsClearly() {
 }  // namespace
 
 int main() {
+    trajectory::test_support::DisableWindowsErrorDialogs();
     TestDefaultsAreApplied();
     TestOptionalArgumentsParse();
     TestMissingGameDefinitionFailsClearly();

@@ -5,6 +5,7 @@
 
 #include "ActionMapping.hpp"
 #include "ActionMappingYaml.hpp"
+#include "TestWindowsSetup.hpp"
 
 namespace {
 
@@ -98,6 +99,7 @@ void TestInvalidThresholdFailsClearly() {
 }  // namespace
 
 int main() {
+    trajectory::test_support::DisableWindowsErrorDialogs();
     TestGameDefinitionParsesFromYaml();
     TestProfileRoundTripsToYaml();
     TestInvalidThresholdFailsClearly();

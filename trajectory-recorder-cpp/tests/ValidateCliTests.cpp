@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "ValidateCli.hpp"
+#include "TestWindowsSetup.hpp"
 
 namespace {
 
@@ -112,6 +113,7 @@ void TestCsvAndStepModeConflictClearly() {
 }  // namespace
 
 int main() {
+    trajectory::test_support::DisableWindowsErrorDialogs();
     TestDefaultsAreApplied();
     TestStepModeParses();
     TestThresholdsParse();

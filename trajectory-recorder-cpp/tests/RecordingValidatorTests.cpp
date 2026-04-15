@@ -6,6 +6,7 @@
 
 #include "BinaryIO.hpp"
 #include "RecordingValidator.hpp"
+#include "TestWindowsSetup.hpp"
 #include "gamepad.pb.h"
 
 namespace {
@@ -140,6 +141,7 @@ void TestAnalyzeSessionFlagsNonMonotonicActions() {
 }  // namespace
 
 int main() {
+    trajectory::test_support::DisableWindowsErrorDialogs();
     TestAnalyzeSessionComputesSummaryMetrics();
     TestAnalyzeSessionFlagsMissingFiles();
     TestAnalyzeSessionFlagsNonMonotonicActions();
