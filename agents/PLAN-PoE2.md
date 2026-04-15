@@ -1,11 +1,3 @@
-# Plan
-
-- [X] video capture with precise frame time recovery
-    - alternative: add into moonlight/sunshine source code
-        - guaranteed to have time-aligned gamepad state and video frames
-
-- [X] test gamepad recording
-
 
 
 - [ ] implement post-processing pipeline
@@ -36,11 +28,6 @@
         - group sets of gamepad inputs together into (S,A,R,S) tuples
             - identify good replay buffer framework
 
-- [ ] real-time inference
-    - see notes below
-    - preferably not using deepstream: see open tabs on iphone/ipad (Paulbridger posts, frame buffer extraction)
-    - idea: gstream `dx12` elements: screencapture, videoconvert, followed by use of `cudaImportExternalMemory` call to convert to torch array on GPU?
-        - HOWEVER: don't overoptimize, try with gstreamer pipeline that converts to system memory first
 
 - [ ] implement game metadata file
     - gamepad -> action mapping
@@ -50,6 +37,4 @@
     - class/character info
     - weapon/loadout info
 
-- [ ] Usability/UX improvements
-    - launch script for video + gamepad recording
 
