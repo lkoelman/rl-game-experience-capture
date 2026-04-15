@@ -10,6 +10,7 @@ C++20 scaffold for recording synchronized gameplay trajectories as video frames 
 - SDL3 for input
 - Protobuf for action serialization
 - OpenCV for offline replay
+- FTXUI for TUI
 
 ## Layout
 
