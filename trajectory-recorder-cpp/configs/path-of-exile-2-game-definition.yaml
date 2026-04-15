@@ -1,0 +1,87 @@
+game_id: path_of_exile_2
+display_name: Path of Exile 2
+classes:
+  - id: warrior
+    label: Warrior
+    actions:
+      # skill gems from https://pathofexile2.wiki.fextralife.com/Warrior
+      - id: earthquake
+        label: Earthquake
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level I."
+      - id: boneshatter
+        label: Boneshatter
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level I."
+      - id: rolling_slam
+        label: Rolling Slam
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level I."
+      - id: mace_strike
+        label: Mace Strike
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level I."
+      - id: shield_charge
+        label: Shield Charge
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level III."
+      - id: armour_breaker
+        label: Armour Breaker
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level III."
+      - id: shockwave_totem
+        label: Shockwave Totem
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level III."
+      - id: infernal_cry
+        label: Infernal Cry
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level III."
+      - id: perfect_strike
+        label: Perfect Strike
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level V."
+      - id: resonating_shield
+        label: Resonating Shield
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level V."
+      - id: leap_slam
+        label: Leap Slam
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level VII."
+      - id: earthshatter
+        label: Earthshatter
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level VII."
+      - id: shield_wall
+        label: Shield Wall
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level VII."
+      - id: sunder
+        label: Sunder
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level IX."
+      - id: volcanic_fissure
+        label: Volcanic Fissure
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level IX."
+      - id: seismic_cry
+        label: Seismic Cry
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level XI."
+      - id: supercharged_slam
+        label: Supercharged Slam
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level XI."
+      - id: stampede
+        label: Stampede
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level XI."
+      - id: ancestral_warrior_totem
+        label: Ancestral Warrior Totem
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level XIII."
+      - id: hammer_of_the_gods
+        label: Hammer of the Gods
+        kind: digital
+        description: "Mace skill gem listed for Warrior at Level XIII."
