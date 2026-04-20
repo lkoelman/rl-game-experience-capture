@@ -5,3 +5,4 @@ CMakeUserPresets.json
 *.pb
 *.csv
 *.mp4
+.codex/skills/openspec*
