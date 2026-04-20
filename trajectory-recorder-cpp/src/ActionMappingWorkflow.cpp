@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <ctime>
 #include <iomanip>
 #include <optional>
@@ -10,6 +11,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <unordered_set>
 #include <vector>
 
 #include <ftxui/component/component.hpp>
@@ -72,6 +74,13 @@ bool BindingsEqual(const ActionBinding& left, const ActionBinding& right) {
            left.direction == right.direction &&
            left.threshold == right.threshold &&
            left.combo_components == right.combo_components;
+}
+
+std::vector<std::string> NormalizeSelectedClassIds(const ActionMappingProfile* profile) {
+    if (profile == nullptr) {
+        return {};
+    }
+    return profile->class_ids;
 }
 
 std::optional<std::size_t> PromptForSelection(const std::string& title,
@@ -145,6 +154,91 @@ std::optional<StartupChoice> PromptForStartupChoice() {
     }
 }
 
+std::optional<std::vector<std::string>> PromptForClassSelection(const GameDefinition& game,
+                                                                const ActionMappingProfile* existing_profile) {
+    if (game.classes.empty()) {
+        return std::nullopt;
+    }
+
+    const auto initial_class_ids = NormalizeSelectedClassIds(existing_profile);
+    std::unordered_set<std::string> initial_lookup(initial_class_ids.begin(), initial_class_ids.end());
+    std::vector<int> selections(game.classes.size(), 0);
+    for (std::size_t index = 0; index < game.classes.size(); ++index) {
+        if (initial_lookup.contains(game.classes[index].id)) {
+            selections[index] = 1;
+        }
+    }
+
+    bool accepted = false;
+    std::string status = "Use arrow keys to move between classes and Left/Right to switch each RadioBox between Inactive and Active. Enter confirms. q or Esc cancels.";
+    auto screen = ftxui::ScreenInteractive::TerminalOutput();
+
+    ftxui::Components rows;
+    rows.reserve(game.classes.size());
+    std::vector<std::vector<std::string>> options(game.classes.size(), {"Inactive", "Active"});
+    for (std::size_t index = 0; index < game.classes.size(); ++index) {
+        rows.push_back(ftxui::Radiobox(&options[index], &selections[index]));
+    }
+
+    auto container = ftxui::Container::Vertical(rows);
+    auto component = ftxui::CatchEvent(container, [&](ftxui::Event event) {
+        if (event == ftxui::Event::Return) {
+            const bool any_selected = std::any_of(selections.begin(), selections.end(), [](int selection) {
+                return selection == 1;
+            });
+            if (!any_selected) {
+                status = "Select at least one active class before continuing.";
+                return true;
+            }
+            accepted = true;
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        if (event == ftxui::Event::Escape || (event.is_character() && event.character() == "q")) {
+            accepted = false;
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        return false;
+    });
+
+    auto renderer = ftxui::Renderer(component, [&] {
+        using namespace ftxui;
+
+        Elements rows_rendered;
+        for (std::size_t index = 0; index < game.classes.size(); ++index) {
+            rows_rendered.push_back(
+                hbox({
+                    text(game.classes[index].label + " (" + game.classes[index].id + ")") | size(WIDTH, GREATER_THAN, 24),
+                    text("  "),
+                    rows[index]->Render(),
+                }));
+        }
+
+        return vbox({
+                   text("Select active classes") | bold,
+                   separator(),
+                   WrappedLine(status),
+                   separator(),
+                   vbox(std::move(rows_rendered)),
+               }) |
+               border;
+    });
+
+    screen.Loop(renderer);
+    if (!accepted) {
+        return std::nullopt;
+    }
+
+    std::vector<std::string> selected_class_ids;
+    for (std::size_t index = 0; index < game.classes.size(); ++index) {
+        if (selections[index] == 1) {
+            selected_class_ids.push_back(game.classes[index].id);
+        }
+    }
+    return selected_class_ids;
+}
+
 bool EditAxisThresholds(ActionMappingProfile& profile) {
     profile.axis_button_thresholds = NormalizeAxisButtonThresholds(profile.axis_button_thresholds);
     std::vector<AxisButtonThreshold> working_thresholds = profile.axis_button_thresholds;
@@ -215,20 +309,20 @@ bool EditAxisThresholds(ActionMappingProfile& profile) {
     return saved;
 }
 
-std::vector<ProfileActionMapping> ExistingActionsForClass(const GameDefinition& game,
-                                                          const std::string& class_id,
-                                                          const ActionMappingProfile* existing_profile) {
+std::vector<ProfileActionMapping> ExistingActionsForClasses(const GameDefinition& game,
+                                                            const std::vector<std::string>& class_ids,
+                                                            const ActionMappingProfile* existing_profile) {
     if (existing_profile == nullptr) {
         return {};
     }
-    if (existing_profile->game_id != game.game_id || existing_profile->class_id != class_id) {
+    if (existing_profile->game_id != game.game_id || NormalizeSelectedClassIds(existing_profile) != class_ids) {
         return {};
     }
     return existing_profile->actions;
 }
 
 ActionMappingProfile BuildProfile(const GameDefinition& game,
-                                  const std::string& class_id,
+                                  const std::vector<std::string>& class_ids,
                                   const std::string& profile_name,
                                   const MappingWorkflowState& workflow,
                                   const ActionMappingProfile& working_profile_seed,
@@ -238,7 +332,7 @@ ActionMappingProfile BuildProfile(const GameDefinition& game,
     ActionMappingProfile profile;
     profile.schema_version = existing_profile != nullptr ? existing_profile->schema_version : 1;
     profile.game_id = game.game_id;
-    profile.class_id = class_id;
+    profile.class_ids = class_ids;
     profile.profile_name = profile_name;
     profile.created_at = existing_profile != nullptr && !existing_profile->created_at.empty()
                              ? existing_profile->created_at
@@ -537,26 +631,15 @@ std::optional<ActionMappingProfile> RunMappingWorkflow(const GameDefinition& gam
             continue;
         }
 
-        std::vector<std::string> class_labels;
-        class_labels.reserve(game.classes.size());
-        int initial_selection = 0;
-        for (std::size_t index = 0; index < game.classes.size(); ++index) {
-            const auto& klass = game.classes[index];
-            class_labels.push_back(klass.label + " (" + klass.id + ")");
-            if (existing_profile != nullptr && existing_profile->class_id == klass.id) {
-                initial_selection = static_cast<int>(index);
-            }
-        }
-
-        const auto class_selection = PromptForSelection("Select a class", class_labels, initial_selection);
-        if (!class_selection.has_value()) {
+        const auto selected_class_ids = PromptForClassSelection(game, existing_profile);
+        if (!selected_class_ids.has_value()) {
             return std::nullopt;
         }
 
-        const ClassDefinition& klass = game.classes[*class_selection];
         const ActionMappingProfile* class_existing_profile =
-            existing_profile != nullptr && existing_profile->class_id == klass.id ? existing_profile : nullptr;
-        MappingWorkflowState workflow(CollectActions(game, klass.id), ExistingActionsForClass(game, klass.id, class_existing_profile));
+            existing_profile != nullptr && NormalizeSelectedClassIds(existing_profile) == *selected_class_ids ? existing_profile : nullptr;
+        MappingWorkflowState workflow(CollectActions(game, *selected_class_ids),
+                                      ExistingActionsForClasses(game, *selected_class_ids, class_existing_profile));
 
         for (;;) {
             if (!workflow.IsFinished()) {
@@ -566,7 +649,7 @@ std::optional<ActionMappingProfile> RunMappingWorkflow(const GameDefinition& gam
                 }
             }
 
-            ActionMappingProfile profile = BuildProfile(game, klass.id, profile_name, workflow, working_profile_seed, class_existing_profile);
+            ActionMappingProfile profile = BuildProfile(game, *selected_class_ids, profile_name, workflow, working_profile_seed, class_existing_profile);
             const ReviewChoice review = RunReviewScreen(game, workflow, profile, max_combo_buttons);
             if (review.cancelled) {
                 return std::nullopt;

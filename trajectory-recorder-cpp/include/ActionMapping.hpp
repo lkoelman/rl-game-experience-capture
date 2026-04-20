@@ -117,14 +117,14 @@ struct ProfileActionMapping {
 
 // Persists one operator's action mapping profile for a selected class.
 // Fields:
-// - metadata fields identify the game, class, schema version, and profile label.
+// - metadata fields identify the game, selected classes, schema version, and profile label.
 // - timestamps track profile creation/update time for offline tooling.
 // - `complete` records whether required actions were fully mapped at save time.
 // - `actions` stores the per-action low-level bindings.
 struct ActionMappingProfile {
     int schema_version{1};
     std::string game_id;
-    std::string class_id;
+    std::vector<std::string> class_ids;
     std::string profile_name;
     std::string created_at;
     std::string updated_at;
@@ -163,6 +163,9 @@ const ClassDefinition* FindClassDefinition(const GameDefinition& game, const std
 
 // Returns the ordered action list for the selected class.
 std::vector<ActionDefinition> CollectActions(const GameDefinition& game, const std::string& class_id);
+
+// Returns the ordered action list for the selected classes in selection order.
+std::vector<ActionDefinition> CollectActions(const GameDefinition& game, const std::vector<std::string>& class_ids);
 
 // Builds the default threshold map for axis-as-button combo members.
 std::vector<AxisButtonThreshold> BuildDefaultAxisButtonThresholds();

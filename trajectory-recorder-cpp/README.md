@@ -192,8 +192,9 @@ The mapper currently:
 
 - loads a YAML game definition grouped by class
 - starts with a mode menu that lets the user either begin mapping or configure axis thresholds for axis-as-button combo capture
-- accepts `--resume-from <existing.yaml>` to preload an existing profile for the selected class and jump to the first unresolved action
+- accepts `--resume-from <existing.yaml>` to preload an existing profile for the selected set of active classes and jump to the first unresolved action
 - accepts `--max-combo-buttons <n>` to raise or lower the allowed number of simultaneous controls in one combo; the default is `2`
+- shows all available classes at startup and lets the operator mark multiple active classes before mapping begins
 - uses an FTXUI terminal workflow with a two-column layout: the current action on the left and an action `Menu` on the right
 - captures gamepad buttons, joystick axes, and trigger thresholds through SDL3
 - supports first-class 2D stick-vector actions using `kind: vector2` in the game definition and `type: stick` bindings in the saved profile
@@ -202,4 +203,4 @@ The mapper currently:
 - shows the last observed gamepad input or combo in real time
 - uses `Space` to confirm the remembered binding or combo, `Right` to advance or skip, `Left` to go back, and `Enter` to open review/save
 - provides a review screen before save that surfaces mapped, skipped, incomplete, and conflicting actions
-- writes `action-mapping.yaml` as a per-user profile keyed by stable action IDs
+- writes `action-mapping.yaml` as a per-user profile keyed by stable action IDs and selected `class_ids`

@@ -181,6 +181,15 @@ std::vector<ActionDefinition> CollectActions(const GameDefinition& game, const s
     return klass->actions;
 }
 
+std::vector<ActionDefinition> CollectActions(const GameDefinition& game, const std::vector<std::string>& class_ids) {
+    std::vector<ActionDefinition> actions;
+    for (const auto& class_id : class_ids) {
+        const auto class_actions = CollectActions(game, class_id);
+        actions.insert(actions.end(), class_actions.begin(), class_actions.end());
+    }
+    return actions;
+}
+
 std::vector<AxisButtonThreshold> BuildDefaultAxisButtonThresholds() {
     std::vector<AxisButtonThreshold> thresholds;
     thresholds.reserve(EligibleAxisButtons().size());
@@ -251,13 +260,27 @@ ValidationResult ValidateProfile(const GameDefinition& game, const ActionMapping
         return result;
     }
 
-    const ClassDefinition* klass = FindClassDefinition(game, profile.class_id);
-    if (klass == nullptr) {
-        AddIssue(result, ValidationSeverity::error, "", "unknown class id in profile: " + profile.class_id);
+    const auto& class_ids = profile.class_ids;
+    if (class_ids.empty()) {
+        AddIssue(result, ValidationSeverity::error, "", "profile must include at least one class id");
         return result;
     }
 
-    const auto applicable_actions = CollectActions(game, profile.class_id);
+    std::unordered_set<std::string> seen_class_ids;
+    for (const auto& class_id : class_ids) {
+        if (!seen_class_ids.insert(class_id).second) {
+            AddIssue(result, ValidationSeverity::error, "", "duplicate class id in profile: " + class_id);
+            continue;
+        }
+        if (FindClassDefinition(game, class_id) == nullptr) {
+            AddIssue(result, ValidationSeverity::error, "", "unknown class id in profile: " + class_id);
+        }
+    }
+    if (HasBlockingIssues(result)) {
+        return result;
+    }
+
+    const auto applicable_actions = CollectActions(game, class_ids);
     std::unordered_map<std::string, ActionDefinition> action_lookup;
     for (const auto& action : applicable_actions) {
         action_lookup.emplace(action.id, action);

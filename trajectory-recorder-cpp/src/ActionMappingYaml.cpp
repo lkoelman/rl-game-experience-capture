@@ -192,7 +192,18 @@ ActionMappingProfile LoadActionMappingProfile(const std::string& path) {
     ActionMappingProfile profile;
     profile.schema_version = root["schema_version"] ? root["schema_version"].as<int>() : 1;
     profile.game_id = root["game_id"] ? root["game_id"].as<std::string>() : "";
-    profile.class_id = root["class_id"] ? root["class_id"].as<std::string>() : "";
+    const YAML::Node class_ids_node = root["class_ids"];
+    if (class_ids_node) {
+        if (!class_ids_node.IsSequence()) {
+            throw std::runtime_error("class_ids must be a sequence");
+        }
+        for (std::size_t index = 0; index < class_ids_node.size(); ++index) {
+            profile.class_ids.push_back(class_ids_node[index].as<std::string>());
+        }
+    }
+    if (!class_ids_node) {
+        throw std::runtime_error("action mapping profile is missing class_ids");
+    }
     profile.profile_name = root["profile_name"] ? root["profile_name"].as<std::string>() : "";
     profile.created_at = root["created_at"] ? root["created_at"].as<std::string>() : "";
     profile.updated_at = root["updated_at"] ? root["updated_at"].as<std::string>() : "";
@@ -241,7 +252,11 @@ void SaveActionMappingProfile(const ActionMappingProfile& profile, const std::st
     out << YAML::BeginMap;
     out << YAML::Key << "schema_version" << YAML::Value << profile.schema_version;
     out << YAML::Key << "game_id" << YAML::Value << profile.game_id;
-    out << YAML::Key << "class_id" << YAML::Value << profile.class_id;
+    out << YAML::Key << "class_ids" << YAML::Value << YAML::BeginSeq;
+    for (const auto& class_id : profile.class_ids) {
+        out << class_id;
+    }
+    out << YAML::EndSeq;
     out << YAML::Key << "profile_name" << YAML::Value << profile.profile_name;
     if (!profile.created_at.empty()) {
         out << YAML::Key << "created_at" << YAML::Value << profile.created_at;

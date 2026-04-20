@@ -402,6 +402,7 @@ Responsibilities:
 
 - load `game-actions.yaml`
 - load/write `action-mapping.yaml`
+- require `class_ids` as the selected-class field in mapping profiles
 - enforce the expected YAML structure and binding field semantics, including top-level axis-button thresholds and combo bindings
 
 ### Gamepad Binding Capture
@@ -437,7 +438,8 @@ Responsibilities:
 
 - prompt for a startup mode selection before class selection
 - optionally edit top-level axis thresholds before mapping begins
-- preload an optional existing mapping profile for the selected class
+- present all classes with per-class Active/Inactive RadioBoxes so the operator can select one or more active classes
+- preload an optional existing mapping profile for the selected class set
 - guide the user through action-by-action mapping with FTXUI
 - render a two-column layout with the current action dialog on the left and an action-status `Menu` on the right
 - support keyboard-driven navigation:

@@ -54,7 +54,7 @@ void TestProfileRoundTripsToYaml() {
     trajectory::mapping::ActionMappingProfile profile;
     profile.schema_version = 1;
     profile.game_id = "demo";
-    profile.class_id = "mage";
+    profile.class_ids = {"mage", "archer"};
     profile.profile_name = "steam-deck";
     profile.complete = true;
     profile.axis_button_thresholds = trajectory::mapping::BuildDefaultAxisButtonThresholds();
@@ -69,6 +69,8 @@ void TestProfileRoundTripsToYaml() {
 
     Expect(loaded.profile_name == "steam-deck", "profile name should round-trip");
     Expect(loaded.actions.size() == 4, "all actions should round-trip");
+    Expect(loaded.class_ids.size() == 2, "multiple class ids should round-trip");
+    Expect(loaded.class_ids[1] == "archer", "class id order should round-trip");
     Expect(loaded.actions[2].bindings[0].type == trajectory::mapping::BindingType::stick, "stick bindings should round-trip");
     Expect(loaded.actions[3].bindings[0].threshold == 0.65f, "trigger thresholds should round-trip");
 }
@@ -77,7 +79,7 @@ void TestComboProfileRoundTripsWithAxisButtonThresholds() {
     trajectory::mapping::ActionMappingProfile profile;
     profile.schema_version = 1;
     profile.game_id = "demo";
-    profile.class_id = "mage";
+    profile.class_ids = {"mage"};
     profile.profile_name = "steam-deck";
     profile.complete = true;
     profile.axis_button_thresholds = trajectory::mapping::BuildDefaultAxisButtonThresholds();
@@ -107,7 +109,8 @@ void TestMissingAxisButtonThresholdsDefaultOnLoad() {
         "action-mapping-combo-default-thresholds.yaml",
         "schema_version: 1\n"
         "game_id: demo\n"
-        "class_id: mage\n"
+        "class_ids:\n"
+        "  - mage\n"
         "profile_name: default\n"
         "complete: true\n"
         "actions:\n"
@@ -126,12 +129,31 @@ void TestMissingAxisButtonThresholdsDefaultOnLoad() {
            "missing axis button thresholds should default on load");
 }
 
+void TestMissingClassIdsFailsClearly() {
+    const auto path = WriteTempFile(
+        "action-mapping-missing-class-ids.yaml",
+        "schema_version: 1\n"
+        "game_id: demo\n"
+        "class_id: mage\n"
+        "profile_name: default\n"
+        "complete: true\n");
+
+    bool threw = false;
+    try {
+        static_cast<void>(trajectory::mapping::LoadActionMappingProfile(path.string()));
+    } catch (const std::exception& error) {
+        threw = std::string(error.what()).find("class_ids") != std::string::npos;
+    }
+    Expect(threw, "profiles without class_ids should fail clearly");
+}
+
 void TestInvalidThresholdFailsClearly() {
     const auto path = WriteTempFile(
         "action-mapping-invalid.yaml",
         "schema_version: 1\n"
         "game_id: demo\n"
-        "class_id: mage\n"
+        "class_ids:\n"
+        "  - mage\n"
         "profile_name: default\n"
         "complete: true\n"
         "actions:\n"
@@ -156,7 +178,8 @@ void TestInvalidStickControlFailsClearly() {
         "action-mapping-invalid-stick.yaml",
         "schema_version: 1\n"
         "game_id: demo\n"
-        "class_id: mage\n"
+        "class_ids:\n"
+        "  - mage\n"
         "profile_name: default\n"
         "complete: true\n"
         "actions:\n"
@@ -177,6 +200,7 @@ int main() {
     TestProfileRoundTripsToYaml();
     TestComboProfileRoundTripsWithAxisButtonThresholds();
     TestMissingAxisButtonThresholdsDefaultOnLoad();
+    TestMissingClassIdsFailsClearly();
     TestInvalidThresholdFailsClearly();
     TestInvalidStickControlFailsClearly();
     return 0;

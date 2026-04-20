@@ -29,6 +29,14 @@ trajectory::mapping::GameDefinition BuildGameDefinition() {
     klass.actions.push_back(ActionDefinition{"cast_fireball", "Cast Fireball", "", ActionInputKind::digital, true});
 
     game.classes.push_back(klass);
+
+    ClassDefinition archer;
+    archer.id = "archer";
+    archer.label = "Archer";
+    archer.actions.push_back(ActionDefinition{"volley", "Volley", "", ActionInputKind::digital, true});
+    archer.actions.push_back(ActionDefinition{"aim_shot", "Aim Shot", "", ActionInputKind::digital, false});
+
+    game.classes.push_back(archer);
     return game;
 }
 
@@ -41,12 +49,22 @@ void TestCollectActionsReturnsClassActions() {
     Expect(actions[3].id == "cast_fireball", "later class actions should remain available");
 }
 
+void TestCollectActionsSupportsMultipleSelectedClasses() {
+    const auto game = BuildGameDefinition();
+    const auto actions = trajectory::mapping::CollectActions(game, std::vector<std::string>{"mage", "archer"});
+
+    Expect(actions.size() == 6, "selected classes should contribute all actions");
+    Expect(actions[0].id == "jump", "first selected class should keep its action order");
+    Expect(actions[4].id == "volley", "later selected classes should append their actions");
+    Expect(actions[5].id == "aim_shot", "all selected class actions should be included");
+}
+
 void TestValidationFindsDuplicateBindingsAcrossActions() {
     const auto game = BuildGameDefinition();
 
     trajectory::mapping::ActionMappingProfile profile;
     profile.game_id = "demo";
-    profile.class_id = "mage";
+    profile.class_ids = {"mage"};
     profile.profile_name = "default";
     profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Button("south")}});
     profile.actions.push_back({"cast_fireball", false, {trajectory::mapping::ActionBinding::Button("south")}});
@@ -69,7 +87,7 @@ void TestValidationFindsMissingRequiredActions() {
 
     trajectory::mapping::ActionMappingProfile profile;
     profile.game_id = "demo";
-    profile.class_id = "mage";
+    profile.class_ids = {"mage"};
     profile.profile_name = "default";
     profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Button("south")}});
 
@@ -79,9 +97,34 @@ void TestValidationFindsMissingRequiredActions() {
     Expect(validation.issues.size() == 3, "three required actions should remain unmapped");
 }
 
+void TestValidationSupportsMultipleSelectedClasses() {
+    const auto game = BuildGameDefinition();
+
+    trajectory::mapping::ActionMappingProfile profile;
+    profile.game_id = "demo";
+    profile.class_ids = {"mage", "archer"};
+    profile.profile_name = "default";
+    profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Button("south")}});
+    profile.actions.push_back({"move_x", false, {trajectory::mapping::ActionBinding::Axis("leftx", "any")}});
+    profile.actions.push_back({"move_character", false, {trajectory::mapping::ActionBinding::Stick("left_stick")}});
+    profile.actions.push_back({"cast_fireball", false, {trajectory::mapping::ActionBinding::Button("east")}});
+    profile.actions.push_back({"volley", false, {trajectory::mapping::ActionBinding::Button("north")}});
+
+    const auto validation = trajectory::mapping::ValidateProfile(game, profile);
+
+    bool found_archer_warning = false;
+    for (const auto& issue : validation.issues) {
+        if (issue.message.find("aim_shot") != std::string::npos) {
+            found_archer_warning = true;
+            break;
+        }
+    }
+    Expect(!found_archer_warning, "optional actions from any selected class should not be required");
+}
+
 void TestWorkflowSupportsSkipConfirmAndEdit() {
     const auto game = BuildGameDefinition();
-    trajectory::mapping::MappingWorkflowState workflow(trajectory::mapping::CollectActions(game, "mage"));
+    trajectory::mapping::MappingWorkflowState workflow(trajectory::mapping::CollectActions(game, std::vector<std::string>{"mage"}));
 
     workflow.AddBindingToCurrentAction(trajectory::mapping::ActionBinding::Button("south"));
     workflow.AdvanceAction();
@@ -106,7 +149,7 @@ void TestWorkflowPreloadsExistingMappingsAndStartsAtFirstUnresolvedAction() {
     existing_actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Button("south")}});
     existing_actions.push_back({"move_x", true, {}});
 
-    trajectory::mapping::MappingWorkflowState workflow(trajectory::mapping::CollectActions(game, "mage"), existing_actions);
+    trajectory::mapping::MappingWorkflowState workflow(trajectory::mapping::CollectActions(game, std::vector<std::string>{"mage"}), existing_actions);
 
     Expect(workflow.CurrentIndex() == 2, "workflow should start at the first unresolved action");
     const auto profile_actions = workflow.BuildProfileActions();
@@ -116,7 +159,7 @@ void TestWorkflowPreloadsExistingMappingsAndStartsAtFirstUnresolvedAction() {
 
 void TestWorkflowNavigationSupportsPreviousAndRightArrowSkipBehavior() {
     const auto game = BuildGameDefinition();
-    trajectory::mapping::MappingWorkflowState workflow(trajectory::mapping::CollectActions(game, "mage"));
+    trajectory::mapping::MappingWorkflowState workflow(trajectory::mapping::CollectActions(game, std::vector<std::string>{"mage"}));
 
     workflow.AdvanceOrSkipCurrentAction();
     Expect(workflow.ActionStates()[0].skipped, "advancing without a binding should skip the current action");
@@ -137,7 +180,7 @@ void TestValidationAcceptsStickBindingForVector2Action() {
 
     trajectory::mapping::ActionMappingProfile profile;
     profile.game_id = "demo";
-    profile.class_id = "mage";
+    profile.class_ids = {"mage"};
     profile.profile_name = "default";
     profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Button("south")}});
     profile.actions.push_back({"move_x", false, {trajectory::mapping::ActionBinding::Axis("leftx", "any")}});
@@ -161,7 +204,7 @@ void TestValidationRejectsAxisBindingForVector2Action() {
 
     trajectory::mapping::ActionMappingProfile profile;
     profile.game_id = "demo";
-    profile.class_id = "mage";
+    profile.class_ids = {"mage"};
     profile.profile_name = "default";
     profile.actions.push_back({"move_character", false, {trajectory::mapping::ActionBinding::Axis("leftx", "any")}});
 
@@ -182,7 +225,7 @@ void TestValidationRejectsStickBindingForAnalogAction() {
 
     trajectory::mapping::ActionMappingProfile profile;
     profile.game_id = "demo";
-    profile.class_id = "mage";
+    profile.class_ids = {"mage"};
     profile.profile_name = "default";
     profile.actions.push_back({"move_x", false, {trajectory::mapping::ActionBinding::Stick("left_stick")}});
 
@@ -203,7 +246,7 @@ void TestValidationFindsDuplicateStickBindingsAcrossActions() {
 
     trajectory::mapping::ActionMappingProfile profile;
     profile.game_id = "demo";
-    profile.class_id = "mage";
+    profile.class_ids = {"mage"};
     profile.profile_name = "default";
     profile.actions.push_back({"move_character", false, {trajectory::mapping::ActionBinding::Stick("left_stick")}});
     profile.actions.push_back({"cast_fireball", false, {trajectory::mapping::ActionBinding::Stick("left_stick")}});
@@ -232,7 +275,7 @@ void TestValidationFindsDuplicateComboBindingsAcrossActions() {
 
     trajectory::mapping::ActionMappingProfile profile;
     profile.game_id = "demo";
-    profile.class_id = "mage";
+    profile.class_ids = {"mage"};
     profile.profile_name = "default";
     profile.axis_button_thresholds = trajectory::mapping::BuildDefaultAxisButtonThresholds();
     profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Combo({
@@ -262,7 +305,7 @@ void TestValidationRejectsOversizedAndDuplicateComboMembers() {
 
     trajectory::mapping::ActionMappingProfile profile;
     profile.game_id = "demo";
-    profile.class_id = "mage";
+    profile.class_ids = {"mage"};
     profile.profile_name = "default";
     profile.axis_button_thresholds = trajectory::mapping::BuildDefaultAxisButtonThresholds();
     profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Combo({
@@ -296,7 +339,7 @@ void TestValidationAcceptsDirectionalAxisButtonsInCombos() {
 
     trajectory::mapping::ActionMappingProfile profile;
     profile.game_id = "demo";
-    profile.class_id = "mage";
+    profile.class_ids = {"mage"};
     profile.profile_name = "default";
     profile.axis_button_thresholds = trajectory::mapping::BuildDefaultAxisButtonThresholds();
     profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Combo({
@@ -321,8 +364,10 @@ void TestValidationAcceptsDirectionalAxisButtonsInCombos() {
 int main() {
     trajectory::test_support::DisableWindowsErrorDialogs();
     TestCollectActionsReturnsClassActions();
+    TestCollectActionsSupportsMultipleSelectedClasses();
     TestValidationFindsDuplicateBindingsAcrossActions();
     TestValidationFindsMissingRequiredActions();
+    TestValidationSupportsMultipleSelectedClasses();
     TestWorkflowSupportsSkipConfirmAndEdit();
     TestWorkflowPreloadsExistingMappingsAndStartsAtFirstUnresolvedAction();
     TestWorkflowNavigationSupportsPreviousAndRightArrowSkipBehavior();
