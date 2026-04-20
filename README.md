@@ -20,7 +20,7 @@ The core idea is simple:
 
 ## Why LeGamer
 
-This repo is aimed at training policies to play real AAA games with a minimal, user-friendly setup, without privileged state informaton.
+This repo is aimed at training policies to play real AAA games with a minimal, user-friendly setup, without privileged state information. It lets you experiment with action foundation models that are typically used in Robotics, but in a more fun and accessible environment:
 
 - build your own gameplay dataset from the games you actually play
 - train agents that learn your controls, your timing, and your habits
