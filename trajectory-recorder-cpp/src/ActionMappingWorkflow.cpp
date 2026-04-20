@@ -434,7 +434,7 @@ MappingScreenResult RunMappingScreen(MappingWorkflowState& workflow,
         return MappingScreenResult::review;
     }
 
-    std::string status = "Space confirms the last observed binding. c clears current bindings. Right advances or skips. Left goes back. Enter opens review/save.";
+    std::string status = "Space confirms the last observed binding and moves to the next action. c clears current bindings. Right advances or skips. Left goes back. Enter opens review/save.";
     std::optional<ObservedBinding> observed;
     std::vector<std::string> menu_entries;
     int selected = static_cast<int>(workflow.CurrentIndex());
@@ -586,10 +586,16 @@ MappingScreenResult RunMappingScreen(MappingWorkflowState& workflow,
             }
 
             workflow.AddBindingToCurrentAction(observed->binding);
-            status = "Captured " + observed->label + ". Press another gamepad input to replace the remembered candidate, or press Right to continue.";
+            workflow.AdvanceAction();
+            status = "Captured " + observed->label + " and moved to the next action.";
             capture.ClearObservedBindings();
             observed.reset();
-            refresh_entries();
+            if (workflow.IsFinished()) {
+                running = false;
+                screen.ExitLoopClosure()();
+            } else {
+                refresh_entries();
+            }
             return true;
         }
         return false;

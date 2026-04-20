@@ -52,7 +52,8 @@ int main(int argc, char* argv[]) {
         trajectory::mapping::GamepadBindingCapture capture;
         capture.Start();
         // RunMappingWorkflow coordinates the interactive TUI flow:
-        // select a class, walk through each action, capture bindings, then review before save.
+        // select a class, walk through each action, confirm captured bindings with Space,
+        // then review before save.
         const auto maybe_profile = trajectory::mapping::RunMappingWorkflow(
             game,
             capture,
