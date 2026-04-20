@@ -1,0 +1,9 @@
+[project]
+name = "game2lerobot"
+version = "0.1.0"
+description = "Convert video game trajectories to LeRobotDataset format"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "lerobot>=0.5.0",
+]
