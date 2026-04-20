@@ -15,7 +15,7 @@ from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
 from .alignment import (
     collect_session_dirs,
-    compute_retained_frame_indices,
+    trim_idle_frame_indices,
     validate_session_dir,
 )
 from .action_encoding import (
@@ -78,7 +78,7 @@ def convert_sessions(
                 raise ValueError("frame count does not match sync.csv entries")
 
             expected_fps = _resolve_expected_fps(expected_fps, fps)
-            retained_indices = compute_retained_frame_indices(
+            retained_indices = trim_idle_frame_indices(
                 frame_timestamps_ns=frame_timestamps_ns,
                 first_action_timestamp_ns=snapshots[0].monotonic_ns
                 if snapshots

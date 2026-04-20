@@ -7,7 +7,7 @@ from .action_encoding import (
 )
 from .alignment import (
     collect_session_dirs,
-    compute_retained_frame_indices,
+    trim_idle_frame_indices,
     validate_session_dir,
 )
 from .metadata import apply_converter_metadata, build_features
@@ -50,7 +50,7 @@ __all__ = [
     "build_features",
     "collect_actions_by_class",
     "collect_session_dirs",
-    "compute_retained_frame_indices",
+    "trim_idle_frame_indices",
     "convert_sessions",
     "encode_action_vector",
     "load_action_mapping_profile",

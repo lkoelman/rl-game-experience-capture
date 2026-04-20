@@ -17,7 +17,7 @@ from game2lerobot import (
     apply_converter_metadata,
     build_action_layout,
     collect_session_dirs,
-    compute_retained_frame_indices,
+    trim_idle_frame_indices,
     convert_sessions,
     encode_action_vector,
     load_action_mapping_profile,
@@ -49,10 +49,10 @@ def test_collect_session_dirs_and_validate_required_files(tmp_path: Path):
     assert validate_session_dir(invalid).missing_files == ("actions.bin", "sync.csv")
 
 
-def test_compute_retained_frame_indices_uses_pre_action_limit():
+def test_trim_idle_frame_indices_uses_pre_action_limit():
     frame_timestamps = [1_000_000_000, 1_500_000_000, 1_800_000_000, 2_000_000_000]
 
-    retained = compute_retained_frame_indices(
+    retained = trim_idle_frame_indices(
         frame_timestamps_ns=frame_timestamps,
         first_action_timestamp_ns=2_000_000_000,
         max_pre_action_seconds=0.6,

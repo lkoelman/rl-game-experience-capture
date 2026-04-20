@@ -137,7 +137,7 @@ Owns session discovery and timeline trimming:
 
 - `collect_session_dirs()`
 - `validate_session_dir()`
-- `compute_retained_frame_indices()`
+- `trim_idle_frame_indices()`
 
 Current behavior:
 

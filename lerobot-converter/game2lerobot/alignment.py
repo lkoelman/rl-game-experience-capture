@@ -28,7 +28,7 @@ def validate_session_dir(session_dir: Path) -> SessionValidationResult:
     return SessionValidationResult(ok=not missing_files, missing_files=missing_files)
 
 
-def compute_retained_frame_indices(
+def trim_idle_frame_indices(
     frame_timestamps_ns: list[int],
     first_action_timestamp_ns: int | None,
     max_pre_action_seconds: float,
