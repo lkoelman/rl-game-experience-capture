@@ -417,9 +417,11 @@ Responsibilities:
 
 Important current behavior:
 
-- digital actions accept gamepad buttons
-- analog actions accept joystick axes and currently store them as explicit per-axis bindings
+- SDL event polling stays on the mapper thread; the workflow posts periodic FTXUI custom events and polls the latest observed binding without blocking the UI
+- digital actions observe the currently pressed gamepad button in real time
+- analog actions accept joystick axes and store them as explicit per-axis bindings
 - trigger actions store a threshold derived from the observed trigger press
+- transient observed bindings are cleared when the operator changes actions or confirms a capture
 
 ### Mapping Workflow
 
@@ -432,7 +434,15 @@ Files:
 Responsibilities:
 
 - prompt for class selection
+- preload an optional existing mapping profile for the selected class
 - guide the user through action-by-action mapping with FTXUI
+- render a two-column layout with the current action dialog on the left and an action-status `Menu` on the right
+- support keyboard-driven navigation:
+  - `Space` confirms the currently observed binding
+  - `Right` advances to the next action, skipping if the current action has no bindings
+  - `Left` returns to the previous action
+  - `Enter` exits the mapping screen into a review/save screen
+- provide a review screen that surfaces validation warnings/errors and allows remapping individual actions before save
 
 ## Dependency Boundaries
 

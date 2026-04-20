@@ -13,6 +13,7 @@ class GamepadBindingCapture;
 // Returns `std::nullopt` when the operator cancels before saving.
 std::optional<ActionMappingProfile> RunMappingWorkflow(const GameDefinition& game,
                                                        GamepadBindingCapture& capture,
-                                                       const std::string& profile_name);
+                                                       const std::string& profile_name,
+                                                       const ActionMappingProfile* existing_profile = nullptr);
 
 }  // namespace trajectory::mapping

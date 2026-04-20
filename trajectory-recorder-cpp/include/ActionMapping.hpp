@@ -101,6 +101,12 @@ enum class ValidationSeverity {
     error,
 };
 
+enum class MappingActionStatus {
+    unmapped,
+    mapped,
+    skipped,
+};
+
 // Describes one validation problem discovered while checking a catalog or profile.
 struct ValidationIssue {
     ValidationSeverity severity{ValidationSeverity::error};
@@ -140,7 +146,8 @@ std::string DescribeBinding(const ActionBinding& binding);
 class MappingWorkflowState {
 public:
     // Seeds workflow state from the resolved action list for one class selection.
-    explicit MappingWorkflowState(std::vector<ActionDefinition> actions);
+    explicit MappingWorkflowState(std::vector<ActionDefinition> actions,
+                                  std::vector<ProfileActionMapping> existing_actions = {});
 
     // Returns true when the cursor has moved past the final action.
     bool IsFinished() const;
@@ -150,6 +157,9 @@ public:
 
     // Returns the action currently being mapped.
     const ActionDefinition& CurrentAction() const;
+
+    // Returns the ordered action definitions shown by the workflow.
+    const std::vector<ActionDefinition>& Actions() const;
 
     // Returns the total number of actions in this workflow.
     std::size_t TotalActions() const;
@@ -166,6 +176,9 @@ public:
     // Adds another binding to the current action and clears any skipped state.
     void AddBindingToCurrentAction(const ActionBinding& binding);
 
+    // Replaces the current action's bindings with the provided set and clears skipped state.
+    void ReplaceCurrentActionBindings(std::vector<ActionBinding> bindings);
+
     // Clears the current action's bindings so the user can remap it from scratch.
     void ClearCurrentActionBindings();
 
@@ -175,8 +188,17 @@ public:
     // Advances the workflow cursor to the next action if one exists.
     void AdvanceAction();
 
+    // Advances the workflow cursor, skipping the current action when it has no bindings.
+    void AdvanceOrSkipCurrentAction();
+
+    // Moves the workflow cursor to the previous action if one exists.
+    void MoveToPreviousAction();
+
     // Jumps the workflow cursor to the named action, used by the review/edit step.
     bool SetCurrentActionById(const std::string& action_id);
+
+    // Returns the mapping status for the action at the provided index.
+    MappingActionStatus StatusForAction(std::size_t index) const;
 
     // Returns the editable per-action workflow state.
     const std::vector<ProfileActionMapping>& ActionStates() const;

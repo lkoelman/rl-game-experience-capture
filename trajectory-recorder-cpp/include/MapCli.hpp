@@ -13,6 +13,7 @@ struct Options {
     std::string game_definition_path;
     std::string output_path = "action-mapping.yaml";
     std::string profile_name = "default";
+    std::string resume_from_path;
 };
 
 // Returns true when the input contains at least one non-whitespace character.
@@ -28,7 +29,7 @@ inline bool HasNonWhitespace(std::string_view value) {
 // Builds the mapper CLI usage string used in validation failures.
 inline std::string BuildUsage(std::string_view program_name) {
     return "Usage: " + std::string(program_name) +
-           " <game-actions.yaml> [action-mapping.yaml] [--profile-name <name>]";
+           " <game-actions.yaml> [action-mapping.yaml] [--profile-name <name>] [--resume-from <existing.yaml>]";
 }
 
 // Parses mapper CLI arguments, applies defaults, and emits usage on invalid input.
@@ -48,6 +49,16 @@ inline bool TryParseArguments(const std::vector<std::string>& args,
                 return false;
             }
             options.profile_name = args[index + 1];
+            ++index;
+            continue;
+        }
+        if (args[index] == "--resume-from") {
+            if (index + 1 >= args.size() || !HasNonWhitespace(args[index + 1])) {
+                error << "Error: resume path must not be empty.\n"
+                      << BuildUsage(program_name) << '\n';
+                return false;
+            }
+            options.resume_from_path = args[index + 1];
             ++index;
             continue;
         }

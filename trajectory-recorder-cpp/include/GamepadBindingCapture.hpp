@@ -34,15 +34,18 @@ public:
     // Releases the opened gamepad and shuts down the SDL subsystems used by the mapper.
     void Stop();
 
-    // Waits for the next binding candidate that matches the expected action kind.
-    // On timeout or setup failure, returns `std::nullopt` and writes a user-facing error.
-    std::optional<ObservedBinding> WaitForBinding(ActionInputKind kind,
-                                                  std::chrono::milliseconds timeout,
-                                                  std::string& error);
+    // Polls SDL events and returns the currently observed binding candidate, if any.
+    std::optional<ObservedBinding> PollBinding(ActionInputKind kind);
+
+    // Clears any transient observed state so the next action starts fresh.
+    void ClearObservedBindings();
 
 private:
     bool started_{false};
     SDL_Gamepad* gamepad_{nullptr};
+    std::optional<ObservedBinding> digital_binding_;
+    std::optional<ObservedBinding> analog_binding_;
+    std::optional<ObservedBinding> trigger_binding_;
 };
 
 }  // namespace trajectory::mapping

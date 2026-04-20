@@ -1,6 +1,7 @@
 #include "ActionMapping.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
@@ -236,11 +237,27 @@ std::string DescribeBinding(const ActionBinding& binding) {
     return description.str();
 }
 
-MappingWorkflowState::MappingWorkflowState(std::vector<ActionDefinition> actions) : actions_(std::move(actions)) {
+MappingWorkflowState::MappingWorkflowState(std::vector<ActionDefinition> actions,
+                                           std::vector<ProfileActionMapping> existing_actions)
+    : actions_(std::move(actions)) {
     profile_actions_.reserve(actions_.size());
     for (const auto& action : actions_) {
-        profile_actions_.push_back(ProfileActionMapping{action.id, false, {}});
+        ProfileActionMapping profile_action{action.id, false, {}};
+        const auto existing_it = std::find_if(existing_actions.begin(), existing_actions.end(), [&](const ProfileActionMapping& existing) {
+            return existing.action_id == action.id;
+        });
+        if (existing_it != existing_actions.end()) {
+            profile_action = *existing_it;
+        }
+        profile_actions_.push_back(std::move(profile_action));
     }
+
+    const auto unresolved_it = std::find_if(profile_actions_.begin(), profile_actions_.end(), [](const ProfileActionMapping& action) {
+        return !action.skipped && action.bindings.empty();
+    });
+    current_index_ = unresolved_it == profile_actions_.end()
+                         ? profile_actions_.size()
+                         : static_cast<std::size_t>(std::distance(profile_actions_.begin(), unresolved_it));
 }
 
 bool MappingWorkflowState::IsFinished() const {
@@ -256,6 +273,10 @@ const ActionDefinition& MappingWorkflowState::CurrentAction() const {
         throw std::runtime_error("workflow has no current action");
     }
     return actions_[current_index_];
+}
+
+const std::vector<ActionDefinition>& MappingWorkflowState::Actions() const {
+    return actions_;
 }
 
 std::size_t MappingWorkflowState::TotalActions() const {
@@ -284,6 +305,12 @@ void MappingWorkflowState::AddBindingToCurrentAction(const ActionBinding& bindin
     action.bindings.push_back(binding);
 }
 
+void MappingWorkflowState::ReplaceCurrentActionBindings(std::vector<ActionBinding> bindings) {
+    auto& action = profile_actions_.at(current_index_);
+    action.skipped = false;
+    action.bindings = std::move(bindings);
+}
+
 void MappingWorkflowState::ClearCurrentActionBindings() {
     auto& action = profile_actions_.at(current_index_);
     action.skipped = false;
@@ -302,6 +329,26 @@ void MappingWorkflowState::AdvanceAction() {
     }
 }
 
+void MappingWorkflowState::AdvanceOrSkipCurrentAction() {
+    if (IsFinished()) {
+        return;
+    }
+
+    auto& action = profile_actions_.at(current_index_);
+    if (action.bindings.empty()) {
+        action.skipped = true;
+    }
+    AdvanceAction();
+}
+
+void MappingWorkflowState::MoveToPreviousAction() {
+    if (current_index_ > 0) {
+        --current_index_;
+    } else if (IsFinished() && !actions_.empty()) {
+        current_index_ = actions_.size() - 1;
+    }
+}
+
 bool MappingWorkflowState::SetCurrentActionById(const std::string& action_id) {
     for (std::size_t index = 0; index < actions_.size(); ++index) {
         if (actions_[index].id == action_id) {
@@ -310,6 +357,17 @@ bool MappingWorkflowState::SetCurrentActionById(const std::string& action_id) {
         }
     }
     return false;
+}
+
+MappingActionStatus MappingWorkflowState::StatusForAction(std::size_t index) const {
+    const auto& action = profile_actions_.at(index);
+    if (action.skipped) {
+        return MappingActionStatus::skipped;
+    }
+    if (!action.bindings.empty()) {
+        return MappingActionStatus::mapped;
+    }
+    return MappingActionStatus::unmapped;
 }
 
 const std::vector<ProfileActionMapping>& MappingWorkflowState::ActionStates() const {

@@ -40,13 +40,24 @@ int main(int argc, char* argv[]) {
     try {
         // Load the game-defined action catalog that drives class selection and per-action prompts.
         const auto game = trajectory::mapping::LoadGameDefinition(options.game_definition_path);
+        std::optional<trajectory::mapping::ActionMappingProfile> existing_profile;
+        if (!options.resume_from_path.empty()) {
+            existing_profile = trajectory::mapping::LoadActionMappingProfile(options.resume_from_path);
+            if (existing_profile->game_id != game.game_id) {
+                throw std::runtime_error("resume profile game_id does not match the loaded game definition");
+            }
+        }
 
         // GamepadBindingCapture owns the SDL lifecycle for the mapper and samples raw controls on demand.
         trajectory::mapping::GamepadBindingCapture capture;
         capture.Start();
         // RunMappingWorkflow coordinates the interactive TUI flow:
         // select a class, walk through each action, capture bindings, then review before save.
-        const auto maybe_profile = trajectory::mapping::RunMappingWorkflow(game, capture, options.profile_name);
+        const auto maybe_profile = trajectory::mapping::RunMappingWorkflow(
+            game,
+            capture,
+            options.profile_name,
+            existing_profile.has_value() ? &*existing_profile : nullptr);
         capture.Stop();
         if (!maybe_profile.has_value()) {
             std::cerr << "Action mapping was cancelled.\n";

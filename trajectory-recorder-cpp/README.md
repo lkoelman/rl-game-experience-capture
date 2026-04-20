@@ -115,7 +115,7 @@ After building, run the executables:
 
 - `record_session [output_dir] [session_name]`
 - `validate_recording <session_dir|sessions_root>`
-- `map_actions <game-actions.yaml> [action-mapping.yaml]`
+- `map_actions <game-actions.yaml> [action-mapping.yaml] [--profile-name <name>] [--resume-from <existing.yaml>]`
 - `convert_dataset <capture.mp4> <sync.csv> <actions.bin>`
 
 ### Record Game Sesion
@@ -184,11 +184,16 @@ Examples:
 ```powershell
 .\builddir\map_actions.exe .\configs\game-actions.yaml
 .\builddir\map_actions.exe .\configs\game-actions.yaml .\profiles\action-mapping.yaml --profile-name "steam-deck"
+.\builddir\map_actions.exe .\configs\game-actions.yaml .\profiles\action-mapping.yaml --resume-from .\profiles\action-mapping.yaml
 ```
 
 The mapper currently:
 
 - loads a YAML game definition grouped by class
-- uses an FTXUI terminal workflow to select a class and walk action-by-action through mappings
+- accepts `--resume-from <existing.yaml>` to preload an existing profile for the selected class and jump to the first unresolved action
+- uses an FTXUI terminal workflow with a two-column layout: the current action on the left and an action `Menu` on the right
 - captures gamepad buttons, joystick axes, and trigger thresholds through SDL3
+- shows the currently observed gamepad input in real time
+- uses `Space` to confirm the currently observed binding, `Right` to advance or skip, `Left` to go back, and `Enter` to open review/save
+- provides a review screen before save that surfaces mapped, skipped, incomplete, and conflicting actions
 - writes `action-mapping.yaml` as a per-user profile keyed by stable action IDs

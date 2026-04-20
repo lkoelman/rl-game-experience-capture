@@ -99,6 +99,38 @@ void TestWorkflowSupportsSkipConfirmAndEdit() {
     Expect(profile_actions[2].bindings[0].control == "east", "other mapped actions should remain unchanged");
 }
 
+void TestWorkflowPreloadsExistingMappingsAndStartsAtFirstUnresolvedAction() {
+    const auto game = BuildGameDefinition();
+    std::vector<trajectory::mapping::ProfileActionMapping> existing_actions;
+    existing_actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Button("south")}});
+    existing_actions.push_back({"move_x", true, {}});
+
+    trajectory::mapping::MappingWorkflowState workflow(trajectory::mapping::CollectActions(game, "mage"), existing_actions);
+
+    Expect(workflow.CurrentIndex() == 2, "workflow should start at the first unresolved action");
+    const auto profile_actions = workflow.BuildProfileActions();
+    Expect(profile_actions[0].bindings[0].control == "south", "existing bindings should be preserved");
+    Expect(profile_actions[1].skipped, "existing skipped actions should be preserved");
+}
+
+void TestWorkflowNavigationSupportsPreviousAndRightArrowSkipBehavior() {
+    const auto game = BuildGameDefinition();
+    trajectory::mapping::MappingWorkflowState workflow(trajectory::mapping::CollectActions(game, "mage"));
+
+    workflow.AdvanceOrSkipCurrentAction();
+    Expect(workflow.ActionStates()[0].skipped, "advancing without a binding should skip the current action");
+    Expect(workflow.CurrentIndex() == 1, "advancing should move to the next action");
+
+    workflow.ReplaceCurrentActionBindings({trajectory::mapping::ActionBinding::Axis("leftx", "any")});
+    workflow.AdvanceOrSkipCurrentAction();
+    Expect(workflow.CurrentIndex() == 2, "advancing with a binding should preserve progress");
+
+    workflow.MoveToPreviousAction();
+    Expect(workflow.CurrentIndex() == 1, "moving left should revisit the previous action");
+    Expect(!workflow.ActionStates()[1].skipped, "moving left should not mutate the previous action");
+    Expect(workflow.ActionStates()[1].bindings[0].control == "leftx", "existing bindings should remain intact when navigating");
+}
+
 }  // namespace
 
 int main() {
@@ -107,5 +139,7 @@ int main() {
     TestValidationFindsDuplicateBindingsAcrossActions();
     TestValidationFindsMissingRequiredActions();
     TestWorkflowSupportsSkipConfirmAndEdit();
+    TestWorkflowPreloadsExistingMappingsAndStartsAtFirstUnresolvedAction();
+    TestWorkflowNavigationSupportsPreviousAndRightArrowSkipBehavior();
     return 0;
 }

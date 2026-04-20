@@ -1,4 +1,4 @@
-The action mapping workflow in trajectory-recorder-cpp\src\ActionMappingWorkflow.cpp is awkward: I want to improve the user experience by changing the workflow and UI.
+The action mapping workflow in src\ActionMappingWorkflow.cpp is awkward: I want to improve the user experience by changing the workflow and UI.
 
 - the currently pressed gamepad button should be shown in real-time
     - we should press Space on the keyboard to confirm the mapping to the currently pressed button
