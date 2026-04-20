@@ -3,6 +3,9 @@
 - [ ] convert gamepad actions (low-level) to player actions (high level, in-game skills/abilities)
     - just map instantaneous button state to ability state
         - use threshold for trigger axes
+    - tasks
+        - [X] implement gamepad-action mapping tool
+        - [ ] test action mapping tool and fix bugs/UX
 
 - [ ] LeRobotDataset converter
     - convert our recording sessions to LeRobotDataset format for easy training with PyTorch and HuggingFace libraries

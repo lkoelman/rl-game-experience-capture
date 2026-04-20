@@ -81,7 +81,7 @@ std::optional<std::size_t> PromptForSelection(const std::string& title, const st
 bool RunActionCaptureScreen(MappingWorkflowState& workflow, GamepadBindingCapture& capture) {
     bool done = false;
     bool cancelled = false;
-    std::string status = "Press Space to capture a binding, Enter to continue, n to skip.";
+    std::string status = "Press Space to capture a binding, Enter to continue to the next action, n to skip.";
     auto screen = ftxui::ScreenInteractive::TerminalOutput();
 
     auto component = ftxui::Renderer([&] {
@@ -150,7 +150,7 @@ bool RunActionCaptureScreen(MappingWorkflowState& workflow, GamepadBindingCaptur
                 status = error;
             } else {
                 workflow.AddBindingToCurrentAction(observed->binding);
-                status = "Captured " + observed->label + ". Press Space to add another binding or Enter to continue.";
+                status = "Captured " + observed->label + ". Press Space to add another binding or Enter to continue to the next action.";
             }
             return true;
         }

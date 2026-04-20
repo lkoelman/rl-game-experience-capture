@@ -118,6 +118,8 @@ After building, run the executables:
 - `map_actions <game-actions.yaml> [action-mapping.yaml]`
 - `convert_dataset <capture.mp4> <sync.csv> <actions.bin>`
 
+### Record Game Sesion
+
 `record_session` now supports pre-recording capture selection:
 
 - `--monitor <id>` selects a monitor by the one-based ID shown in the selector
@@ -153,6 +155,8 @@ $env:PATH = "C:\Program Files\gstreamer\1.0\msvc_x86_64\bin;$env:PATH"
 .\builddir\record_session.exe .\data test_session
 ```
 
+### Validate Recording
+
 `validate_recording` validates one recorded session or scans a directory containing multiple session folders.
 
 Examples:
@@ -170,6 +174,8 @@ The validator currently:
 - parses `sync.csv` and `actions.bin`
 - reports timing, dead-period, idle-gap, and input-frequency statistics
 - supports summary, JSON, CSV, and text-based step-through modes
+
+### Gamepad Mapping
 
 `map_actions` builds a per-user mapping between raw gamepad inputs and in-game action IDs defined in a YAML game definition file.
 
