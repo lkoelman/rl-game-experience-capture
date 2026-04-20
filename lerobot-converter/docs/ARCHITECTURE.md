@@ -29,10 +29,8 @@ The output side is one LeRobotDataset with:
 
 ## Top-Level Structure
 
-- `main.py`
-  Thin CLI entrypoint. Parses batch arguments and delegates to the package.
 - `game2lerobot/`
-  Runtime library code.
+  Runtime library code, including the CLI entrypoint in `cli.py`.
 - `tests/`
   Pytest coverage for core conversion behavior and CLI argument wiring.
 - `README.md`
@@ -44,14 +42,13 @@ The output side is one LeRobotDataset with:
 
 The conversion path is:
 
-1. `main.py`
-2. `game2lerobot.converter`
-3. `game2lerobot.pipeline.convert_sessions()`
-4. `game2lerobot.alignment`
-5. `game2lerobot.parsing`
-6. `game2lerobot.action_encoding`
-7. `game2lerobot.metadata`
-8. `lerobot.datasets.LeRobotDataset`
+1. `game2lerobot.cli`
+2. `game2lerobot.pipeline.convert_sessions()`
+3. `game2lerobot.alignment`
+4. `game2lerobot.parsing`
+5. `game2lerobot.action_encoding`
+6. `game2lerobot.metadata`
+7. `lerobot.datasets.LeRobotDataset`
 
 In practical terms:
 
@@ -310,19 +307,7 @@ Be careful:
 - this module is where failures become either skipped-session reasons or fatal errors
 - changing exception handling here changes CLI behavior even if lower modules stay the same
 
-### `game2lerobot.converter`
-
-Compatibility facade.
-
-Purpose:
-
-- preserve the original single-module import surface
-- re-export public functions and types from the split modules
-
-If you add a new public library entrypoint that should be importable from
-`game2lerobot.converter`, export it here and in `game2lerobot.__init__`.
-
-### `main.py`
+### `game2lerobot.cli`
 
 CLI boundary only.
 
@@ -332,7 +317,7 @@ Responsibilities:
 - load YAML inputs
 - call `convert_sessions()`
 
-This file should stay thin. Business logic belongs in `game2lerobot/`.
+This file should stay thin. Business logic belongs in the rest of `game2lerobot/`.
 
 ## External Interfaces
 
@@ -361,7 +346,7 @@ Behavior:
 
 Primary callable:
 
-- `game2lerobot.converter.convert_sessions(...)`
+- `game2lerobot.convert_sessions(...)`
 
 Primary parser entrypoints:
 
@@ -542,11 +527,11 @@ Implication:
 - adding keyboard-aware actions is not a parsing-only change
 - it requires a contract change in `action_encoding.py`, tests, and likely the spec/task artifacts
 
-### Compatibility Facade Constraint
+### Package Surface Constraint
 
-`game2lerobot.converter` exists to preserve imports after the package split.
+`game2lerobot.__init__` is the supported public import surface.
 
 Implication:
 
-- avoid putting new logic there
-- keep it as an export layer unless you intentionally want to change the public API
+- export public library entrypoints there
+- keep CLI-specific wiring in `game2lerobot.cli`

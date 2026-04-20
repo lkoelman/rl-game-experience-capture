@@ -6,7 +6,7 @@ import pytest
 import yaml
 from google.protobuf import descriptor_pb2, descriptor_pool, message_factory
 
-from game2lerobot.converter import (
+from game2lerobot import (
     ActionBinding,
     ActionDefinition,
     ActionLayoutEntry,
@@ -40,7 +40,10 @@ def test_collect_session_dirs_and_validate_required_files(tmp_path: Path):
 
     sessions = collect_session_dirs(tmp_path)
 
-    assert [session.name for session in sessions] == ["invalid_session", "valid_session"]
+    assert [session.name for session in sessions] == [
+        "invalid_session",
+        "valid_session",
+    ]
     assert validate_session_dir(valid).ok is True
     assert validate_session_dir(invalid).ok is False
     assert validate_session_dir(invalid).missing_files == ("actions.bin", "sync.csv")
@@ -85,14 +88,24 @@ def test_build_action_layout_and_encode_vector():
     bindings = {
         "move": [ActionBinding(type=BindingType.STICK, control="left_stick")],
         "strike": [ActionBinding(type=BindingType.BUTTON, control="south")],
-        "aim": [ActionBinding(type=BindingType.AXIS, control="leftx", direction="positive")],
-        "heavy": [ActionBinding(type=BindingType.TRIGGER, control="right_trigger", threshold=0.5)],
+        "aim": [
+            ActionBinding(type=BindingType.AXIS, control="leftx", direction="positive")
+        ],
+        "heavy": [
+            ActionBinding(
+                type=BindingType.TRIGGER, control="right_trigger", threshold=0.5
+            )
+        ],
         "unmapped": [],
     }
 
-    encoded = encode_action_vector(layout=layout, bindings_by_action=bindings, snapshot=snapshot)
+    encoded = encode_action_vector(
+        layout=layout, bindings_by_action=bindings, snapshot=snapshot
+    )
 
-    assert np.allclose(encoded, np.array([0.25, -0.75, 1.0, 0.25, 0.8, 0.0], dtype=np.float32))
+    assert np.allclose(
+        encoded, np.array([0.25, -0.75, 1.0, 0.25, 0.8, 0.0], dtype=np.float32)
+    )
 
 
 def test_apply_converter_metadata_uses_namespaced_extension():
@@ -121,7 +134,9 @@ def test_apply_converter_metadata_uses_namespaced_extension():
     assert "game_converter" in info["extensions"]
     assert info["extensions"]["game_converter"]["game_id"] == "path_of_exile_2"
     assert info["extensions"]["game_converter"]["settings"]["task"] == "Clear the zone"
-    assert info["extensions"]["game_converter"]["action_layout"][0]["action_id"] == "move"
+    assert (
+        info["extensions"]["game_converter"]["action_layout"][0]["action_id"] == "move"
+    )
 
 
 def test_read_sync_csv_and_actions_bin_round_trip(tmp_path: Path):
@@ -132,8 +147,18 @@ def test_read_sync_csv_and_actions_bin_round_trip(tmp_path: Path):
     _write_actions_bin(
         actions_path,
         [
-            GamepadSnapshot(monotonic_ns=900, axes=(0.1, -0.2), pressed_buttons=(1,), pressed_keys=(8,)),
-            GamepadSnapshot(monotonic_ns=1900, axes=(0.3, 0.4), pressed_buttons=(2,), pressed_keys=()),
+            GamepadSnapshot(
+                monotonic_ns=900,
+                axes=(0.1, -0.2),
+                pressed_buttons=(1,),
+                pressed_keys=(8,),
+            ),
+            GamepadSnapshot(
+                monotonic_ns=1900,
+                axes=(0.3, 0.4),
+                pressed_buttons=(2,),
+                pressed_keys=(),
+            ),
         ],
     )
 
@@ -173,7 +198,12 @@ def test_convert_sessions_writes_dataset_and_metadata(tmp_path: Path):
     _write_actions_bin(
         valid / "actions.bin",
         [
-            GamepadSnapshot(monotonic_ns=1010000000, axes=(0.5, -0.5, 0.0, 0.0, 0.9), pressed_buttons=(1,), pressed_keys=(42,)),
+            GamepadSnapshot(
+                monotonic_ns=1010000000,
+                axes=(0.5, -0.5, 0.0, 0.0, 0.9),
+                pressed_buttons=(1,),
+                pressed_keys=(42,),
+            ),
         ],
     )
 
@@ -206,9 +236,24 @@ def test_convert_sessions_writes_dataset_and_metadata(tmp_path: Path):
                 "profile_name": "test-profile",
                 "complete": False,
                 "actions": {
-                    "move": {"skipped": False, "bindings": [{"type": "stick", "control": "left_stick"}]},
-                    "attack": {"skipped": False, "bindings": [{"type": "button", "control": "south"}]},
-                    "heavy": {"skipped": False, "bindings": [{"type": "trigger", "control": "right_trigger", "threshold": 0.5}]},
+                    "move": {
+                        "skipped": False,
+                        "bindings": [{"type": "stick", "control": "left_stick"}],
+                    },
+                    "attack": {
+                        "skipped": False,
+                        "bindings": [{"type": "button", "control": "south"}],
+                    },
+                    "heavy": {
+                        "skipped": False,
+                        "bindings": [
+                            {
+                                "type": "trigger",
+                                "control": "right_trigger",
+                                "threshold": 0.5,
+                            }
+                        ],
+                    },
                 },
             }
         )
@@ -225,16 +270,28 @@ def test_convert_sessions_writes_dataset_and_metadata(tmp_path: Path):
         strict=False,
     )
 
-    assert result == ConversionResult(converted_sessions=("session_valid",), skipped_sessions={"session_invalid": "missing required files: actions.bin, sync.csv"})
+    assert result == ConversionResult(
+        converted_sessions=("session_valid",),
+        skipped_sessions={
+            "session_invalid": "missing required files: actions.bin, sync.csv"
+        },
+    )
     info = result.dataset.meta.info
     assert info["fps"] == 30
     assert info["total_episodes"] == 1
     assert info["features"]["observation.images.main"]["dtype"] == "video"
     assert info["features"]["action"]["shape"] == (4,)
-    assert info["extensions"]["game_converter"]["converted_sessions"] == ["session_valid"]
-    assert info["extensions"]["game_converter"]["skipped_sessions"]["session_invalid"] == "missing required files: actions.bin, sync.csv"
+    assert info["extensions"]["game_converter"]["converted_sessions"] == [
+        "session_valid"
+    ]
+    assert (
+        info["extensions"]["game_converter"]["skipped_sessions"]["session_invalid"]
+        == "missing required files: actions.bin, sync.csv"
+    )
     assert info["extensions"]["game_converter"]["settings"]["task"] == "Defeat enemies"
-    assert info["extensions"]["game_converter"]["action_layout"][2]["action_id"] == "heavy"
+    assert (
+        info["extensions"]["game_converter"]["action_layout"][2]["action_id"] == "heavy"
+    )
 
 
 def test_convert_sessions_strict_mode_fails_on_invalid_session(tmp_path: Path):
@@ -266,7 +323,10 @@ def test_convert_sessions_strict_mode_fails_on_invalid_session(tmp_path: Path):
         )
     )
 
-    with pytest.raises(ValueError, match="session_invalid: missing required files: actions.bin, sync.csv"):
+    with pytest.raises(
+        ValueError,
+        match="session_invalid: missing required files: actions.bin, sync.csv",
+    ):
         convert_sessions(
             session_root=batch_root,
             game_definition=load_game_definition(game_definition_path),

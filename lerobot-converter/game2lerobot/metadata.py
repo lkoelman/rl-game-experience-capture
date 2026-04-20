@@ -32,7 +32,9 @@ def apply_converter_metadata(info: dict, metadata: ConversionMetadata) -> None:
     }
 
 
-def build_features(layout: list[ActionLayoutEntry], frame_shape: tuple[int, int, int]) -> dict[str, dict[str, Any]]:
+def build_features(
+    layout: list[ActionLayoutEntry], frame_shape: tuple[int, int, int]
+) -> dict[str, dict[str, Any]]:
     """Create the v1 LeRobot feature schema for video-only observations."""
 
     return {
@@ -44,6 +46,8 @@ def build_features(layout: list[ActionLayoutEntry], frame_shape: tuple[int, int,
         "action": {
             "dtype": "float32",
             "shape": (sum(entry.size for entry in layout),),
-            "names": {"axes": [entry.action_id for entry in layout for _ in range(entry.size)]},
+            "names": {
+                "axes": [entry.action_id for entry in layout for _ in range(entry.size)]
+            },
         },
     }

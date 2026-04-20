@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from main import main
+from game2lerobot.cli import main
 
 
 def test_main_parses_batch_cli_arguments(monkeypatch, tmp_path: Path):
@@ -17,9 +17,13 @@ def test_main_parses_batch_cli_arguments(monkeypatch, tmp_path: Path):
     def fake_convert_sessions(**kwargs):
         captured["convert_kwargs"] = kwargs
 
-    monkeypatch.setattr("main.load_game_definition", fake_load_game_definition)
-    monkeypatch.setattr("main.load_action_mapping_profile", fake_load_action_mapping_profile)
-    monkeypatch.setattr("main.convert_sessions", fake_convert_sessions)
+    monkeypatch.setattr(
+        "game2lerobot.cli.load_game_definition", fake_load_game_definition
+    )
+    monkeypatch.setattr(
+        "game2lerobot.cli.load_action_mapping_profile", fake_load_action_mapping_profile
+    )
+    monkeypatch.setattr("game2lerobot.cli.convert_sessions", fake_convert_sessions)
 
     main(
         [

@@ -13,10 +13,23 @@ from pathlib import Path
 from lerobot.datasets.io_utils import write_info
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
-from .alignment import collect_session_dirs, compute_retained_frame_indices, validate_session_dir
-from .action_encoding import build_action_layout, collect_actions_by_class, encode_action_vector
+from .alignment import (
+    collect_session_dirs,
+    compute_retained_frame_indices,
+    validate_session_dir,
+)
+from .action_encoding import (
+    build_action_layout,
+    collect_actions_by_class,
+    encode_action_vector,
+)
 from .metadata import apply_converter_metadata, build_features
-from .models import ConversionMetadata, ConversionResult, GameDefinition, GamepadSnapshot
+from .models import (
+    ConversionMetadata,
+    ConversionResult,
+    GameDefinition,
+    GamepadSnapshot,
+)
 from .parsing import read_actions_bin, read_sync_csv, read_video_frames
 
 
@@ -39,7 +52,9 @@ def convert_sessions(
     - Persists converter metadata into `meta/info.json`.
     """
 
-    action_definitions = collect_actions_by_class(game_definition.classes, action_mapping.class_ids)
+    action_definitions = collect_actions_by_class(
+        game_definition.classes, action_mapping.class_ids
+    )
     layout = build_action_layout(action_definitions)
     skipped_sessions: dict[str, str] = {}
     converted_sessions: list[str] = []
@@ -65,7 +80,9 @@ def convert_sessions(
             expected_fps = _resolve_expected_fps(expected_fps, fps)
             retained_indices = compute_retained_frame_indices(
                 frame_timestamps_ns=frame_timestamps_ns,
-                first_action_timestamp_ns=snapshots[0].monotonic_ns if snapshots else None,
+                first_action_timestamp_ns=snapshots[0].monotonic_ns
+                if snapshots
+                else None,
                 max_pre_action_seconds=max_pre_action_seconds,
             )
             if not retained_indices:
@@ -140,19 +157,26 @@ def _write_session_episode(
     layout,
     task: str,
 ) -> None:
-    baseline = GamepadSnapshot(monotonic_ns=0, axes=(), pressed_buttons=(), pressed_keys=())
+    baseline = GamepadSnapshot(
+        monotonic_ns=0, axes=(), pressed_buttons=(), pressed_keys=()
+    )
     snapshot_index = 0
     current_snapshot = baseline
 
     for frame_index in retained_indices:
         frame_timestamp = frame_timestamps_ns[frame_index]
-        while snapshot_index < len(snapshots) and snapshots[snapshot_index].monotonic_ns <= frame_timestamp:
+        while (
+            snapshot_index < len(snapshots)
+            and snapshots[snapshot_index].monotonic_ns <= frame_timestamp
+        ):
             current_snapshot = snapshots[snapshot_index]
             snapshot_index += 1
         dataset.add_frame(
             {
                 "observation.images.main": frames[frame_index],
-                "action": encode_action_vector(layout, bindings_by_action, current_snapshot),
+                "action": encode_action_vector(
+                    layout, bindings_by_action, current_snapshot
+                ),
                 "task": task,
             }
         )

@@ -1,17 +1,16 @@
 import argparse
 from pathlib import Path
 
-from game2lerobot.converter import (
-    convert_sessions,
-    load_action_mapping_profile,
-    load_game_definition,
-)
+from .parsing import load_action_mapping_profile, load_game_definition
+from .pipeline import convert_sessions
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Create the batch converter CLI parser used by the console entrypoint."""
 
-    parser = argparse.ArgumentParser(description="Convert recorded gameplay sessions to a LeRobotDataset.")
+    parser = argparse.ArgumentParser(
+        description="Convert recorded gameplay sessions to a LeRobotDataset."
+    )
     parser.add_argument("--session-root", type=Path, required=True)
     parser.add_argument("--game-definition", type=Path, required=True)
     parser.add_argument("--action-mapping", type=Path, required=True)
@@ -37,7 +36,3 @@ def main(argv: list[str] | None = None):
         max_pre_action_seconds=args.max_pre_action_seconds,
         strict=args.strict,
     )
-
-
-if __name__ == "__main__":
-    main()

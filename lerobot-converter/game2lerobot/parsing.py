@@ -54,7 +54,9 @@ def read_actions_bin(path: Path) -> list[GamepadSnapshot]:
                 GamepadSnapshot(
                     monotonic_ns=int(message.monotonic_ns),
                     axes=tuple(float(value) for value in message.axes),
-                    pressed_buttons=tuple(int(value) for value in message.pressed_buttons),
+                    pressed_buttons=tuple(
+                        int(value) for value in message.pressed_buttons
+                    ),
                     pressed_keys=tuple(int(value) for value in message.pressed_keys),
                 )
             )
@@ -112,7 +114,9 @@ def read_video_frames(path: Path) -> tuple[list[np.ndarray], int]:
     with av.open(str(path)) as container:
         stream = container.streams.video[0]
         fps = int(round(float(stream.average_rate or stream.base_rate)))
-        frames = [frame.to_ndarray(format="rgb24") for frame in container.decode(stream)]
+        frames = [
+            frame.to_ndarray(format="rgb24") for frame in container.decode(stream)
+        ]
     return frames, fps
 
 
@@ -125,10 +129,30 @@ def _get_gamepad_state_message():
         message = file_descriptor.message_type.add()
         message.name = "GamepadState"
         for name, number, field_type, label in (
-            ("monotonic_ns", 1, descriptor_pb2.FieldDescriptorProto.TYPE_UINT64, descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL),
-            ("axes", 2, descriptor_pb2.FieldDescriptorProto.TYPE_FLOAT, descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED),
-            ("pressed_buttons", 3, descriptor_pb2.FieldDescriptorProto.TYPE_UINT32, descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED),
-            ("pressed_keys", 4, descriptor_pb2.FieldDescriptorProto.TYPE_UINT32, descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED),
+            (
+                "monotonic_ns",
+                1,
+                descriptor_pb2.FieldDescriptorProto.TYPE_UINT64,
+                descriptor_pb2.FieldDescriptorProto.LABEL_OPTIONAL,
+            ),
+            (
+                "axes",
+                2,
+                descriptor_pb2.FieldDescriptorProto.TYPE_FLOAT,
+                descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED,
+            ),
+            (
+                "pressed_buttons",
+                3,
+                descriptor_pb2.FieldDescriptorProto.TYPE_UINT32,
+                descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED,
+            ),
+            (
+                "pressed_keys",
+                4,
+                descriptor_pb2.FieldDescriptorProto.TYPE_UINT32,
+                descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED,
+            ),
         ):
             field = message.field.add()
             field.name = name
