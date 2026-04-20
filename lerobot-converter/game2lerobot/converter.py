@@ -6,7 +6,7 @@ preserves the old import surface for tests and callers.
 """
 
 from .alignment import collect_session_dirs, compute_retained_frame_indices, validate_session_dir
-from .encoding import build_action_layout, collect_actions_by_class, encode_action_vector
+from .action_encoding import build_action_layout, collect_actions_by_class, encode_action_vector
 from .metadata import apply_converter_metadata, build_features
 from .models import (
     ActionBinding,
