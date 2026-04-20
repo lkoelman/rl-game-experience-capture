@@ -41,3 +41,4 @@
 - [ ] multi-class action representation
     - group abilities into (`AoE`, `AoE_slow`, `delayed_AoE`, `meelee`, `directed_AoE`, `ranged_directed`, ...)
     - create one action representation per similar profile (e.g. meelee fighter, ranged magic user, close-up magic user)
+    - add the real class into the task description during training "Complete the level as Warrior"
