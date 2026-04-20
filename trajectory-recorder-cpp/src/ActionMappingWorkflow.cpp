@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <ctime>
 #include <iomanip>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -162,29 +163,27 @@ std::optional<std::vector<std::string>> PromptForClassSelection(const GameDefini
 
     const auto initial_class_ids = NormalizeSelectedClassIds(existing_profile);
     std::unordered_set<std::string> initial_lookup(initial_class_ids.begin(), initial_class_ids.end());
-    std::vector<int> selections(game.classes.size(), 0);
+    std::vector<std::shared_ptr<bool>> selections;
+    selections.reserve(game.classes.size());
     for (std::size_t index = 0; index < game.classes.size(); ++index) {
-        if (initial_lookup.contains(game.classes[index].id)) {
-            selections[index] = 1;
-        }
+        selections.push_back(std::make_shared<bool>(initial_lookup.contains(game.classes[index].id)));
     }
 
     bool accepted = false;
-    std::string status = "Use arrow keys to move between classes and Left/Right to switch each RadioBox between Inactive and Active. Enter confirms. q or Esc cancels.";
+    std::string status = "Use arrow keys to move between classes and Space to toggle each checkbox. Enter confirms. q or Esc cancels.";
     auto screen = ftxui::ScreenInteractive::TerminalOutput();
 
     ftxui::Components rows;
     rows.reserve(game.classes.size());
-    std::vector<std::vector<std::string>> options(game.classes.size(), {"Inactive", "Active"});
     for (std::size_t index = 0; index < game.classes.size(); ++index) {
-        rows.push_back(ftxui::Radiobox(&options[index], &selections[index]));
+        rows.push_back(ftxui::Checkbox(game.classes[index].label + " (" + game.classes[index].id + ")", selections[index].get()));
     }
 
     auto container = ftxui::Container::Vertical(rows);
     auto component = ftxui::CatchEvent(container, [&](ftxui::Event event) {
         if (event == ftxui::Event::Return) {
-            const bool any_selected = std::any_of(selections.begin(), selections.end(), [](int selection) {
-                return selection == 1;
+            const bool any_selected = std::any_of(selections.begin(), selections.end(), [](const std::shared_ptr<bool>& selection) {
+                return *selection;
             });
             if (!any_selected) {
                 status = "Select at least one active class before continuing.";
@@ -204,23 +203,12 @@ std::optional<std::vector<std::string>> PromptForClassSelection(const GameDefini
 
     auto renderer = ftxui::Renderer(component, [&] {
         using namespace ftxui;
-
-        Elements rows_rendered;
-        for (std::size_t index = 0; index < game.classes.size(); ++index) {
-            rows_rendered.push_back(
-                hbox({
-                    text(game.classes[index].label + " (" + game.classes[index].id + ")") | size(WIDTH, GREATER_THAN, 24),
-                    text("  "),
-                    rows[index]->Render(),
-                }));
-        }
-
         return vbox({
                    text("Select active classes") | bold,
                    separator(),
                    WrappedLine(status),
                    separator(),
-                   vbox(std::move(rows_rendered)),
+                   component->Render(),
                }) |
                border;
     });
@@ -232,7 +220,7 @@ std::optional<std::vector<std::string>> PromptForClassSelection(const GameDefini
 
     std::vector<std::string> selected_class_ids;
     for (std::size_t index = 0; index < game.classes.size(); ++index) {
-        if (selections[index] == 1) {
+        if (*selections[index]) {
             selected_class_ids.push_back(game.classes[index].id);
         }
     }

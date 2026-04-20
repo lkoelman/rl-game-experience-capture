@@ -438,7 +438,7 @@ Responsibilities:
 
 - prompt for a startup mode selection before class selection
 - optionally edit top-level axis thresholds before mapping begins
-- present all classes with per-class Active/Inactive RadioBoxes so the operator can select one or more active classes
+- present all classes with per-class checkboxes so the operator can select one or more active classes
 - preload an optional existing mapping profile for the selected class set
 - guide the user through action-by-action mapping with FTXUI
 - render a two-column layout with the current action dialog on the left and an action-status `Menu` on the right
