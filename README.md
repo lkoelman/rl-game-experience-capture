@@ -1,5 +1,12 @@
 # LeGamer
 
+<p align="center">
+  <img src="docs/assets/huggingface-logo.svg" alt="Hugging Face" height="72" style="vertical-align: middle;" />
+  <span style="display: inline-block; margin: 0 16px; font-size: 32px; font-weight: 700; line-height: 72px; vertical-align: middle;">X</span>
+  <img src="docs/assets/path-of-exile_PoE2_icon.png" alt="Path of Exile 2" height="72" style="vertical-align: middle;" />
+</p>
+
+
 Record real gameplay. Turn it into training data. Build agents that learn how you play.
 
 LeGamer is a monorepo for game-centric agent training workflows: capture synchronized gameplay sessions, map raw controller input to meaningful in-game actions, convert recordings into `LeRobotDataset` format, and prepare for a future where custom agents can assist you, imitate your style, and eventually compete against each other.
