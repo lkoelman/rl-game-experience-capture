@@ -57,6 +57,7 @@ int main(int argc, char* argv[]) {
             game,
             capture,
             options.profile_name,
+            options.max_combo_buttons,
             existing_profile.has_value() ? &*existing_profile : nullptr);
         capture.Stop();
         if (!maybe_profile.has_value()) {
@@ -67,7 +68,7 @@ int main(int argc, char* argv[]) {
         trajectory::mapping::ActionMappingProfile profile = *maybe_profile;
 
         // ValidateProfile checks that the captured bindings still match the selected catalog and do not conflict.
-        const auto validation = trajectory::mapping::ValidateProfile(game, profile);
+        const auto validation = trajectory::mapping::ValidateProfile(game, profile, options.max_combo_buttons);
 
         // Persist whether the saved profile is complete enough for downstream tooling without follow-up mapping work.
         profile.complete = !std::any_of(validation.issues.begin(), validation.issues.end(), [](const trajectory::mapping::ValidationIssue& issue) {

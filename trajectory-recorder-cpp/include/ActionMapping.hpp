@@ -6,6 +6,9 @@
 
 namespace trajectory::mapping {
 
+inline constexpr int kDefaultMaxComboButtons = 2;
+inline constexpr float kDefaultAxisButtonThreshold = 0.5f;
+
 // Describes how a high-level action is expected to be bound in a user profile.
 enum class ActionInputKind {
     digital,
@@ -47,6 +50,28 @@ enum class BindingType {
     button,
     axis,
     trigger,
+    combo,
+};
+
+enum class ComboComponentType {
+    button,
+    axis_button,
+};
+
+struct ComboComponent {
+    ComboComponentType type{ComboComponentType::button};
+    std::string control;
+    std::string direction;
+
+    static ComboComponent Button(std::string control_name);
+    static ComboComponent AxisButton(std::string control_name, std::string direction_name);
+
+    bool operator==(const ComboComponent& other) const = default;
+};
+
+struct AxisButtonThreshold {
+    std::string control;
+    float threshold{kDefaultAxisButtonThreshold};
 };
 
 // Stores one low-level controller binding as persisted in `action-mapping.yaml`.
@@ -55,11 +80,13 @@ enum class BindingType {
 // - `control`: stable button/axis/trigger name.
 // - `direction`: axis direction qualifier for analog bindings.
 // - `threshold`: activation threshold for trigger bindings.
+// - `combo_components`: component controls pressed together for combo bindings.
 struct ActionBinding {
     BindingType type{BindingType::button};
     std::string control;
     std::string direction;
     float threshold{0.5f};
+    std::vector<ComboComponent> combo_components;
 
     // Creates a button-backed binding using a stable gamepad button name.
     static ActionBinding Button(std::string control_name);
@@ -69,6 +96,11 @@ struct ActionBinding {
 
     // Creates a trigger binding using a stable trigger name and activation threshold.
     static ActionBinding Trigger(std::string control_name, float activation_threshold);
+
+    // Creates one simultaneous combo binding from multiple component controls.
+    static ActionBinding Combo(std::vector<ComboComponent> components);
+
+    bool operator==(const ActionBinding& other) const = default;
 };
 
 // Captures the mapping state for a single action inside a user profile.
@@ -92,6 +124,7 @@ struct ActionMappingProfile {
     std::string created_at;
     std::string updated_at;
     bool complete{false};
+    std::vector<AxisButtonThreshold> axis_button_thresholds;
     std::vector<ProfileActionMapping> actions;
 };
 
@@ -126,11 +159,22 @@ const ClassDefinition* FindClassDefinition(const GameDefinition& game, const std
 // Returns the ordered action list for the selected class.
 std::vector<ActionDefinition> CollectActions(const GameDefinition& game, const std::string& class_id);
 
+// Builds the default threshold map for axis-as-button combo members.
+std::vector<AxisButtonThreshold> BuildDefaultAxisButtonThresholds();
+
+// Returns a normalized threshold map that fills missing eligible axes with defaults.
+std::vector<AxisButtonThreshold> NormalizeAxisButtonThresholds(const std::vector<AxisButtonThreshold>& thresholds);
+
+// Resolves the configured threshold for one axis-as-button control.
+float ResolveAxisButtonThreshold(const ActionMappingProfile& profile, const std::string& control);
+
 // Validates catalog structure such as duplicate ids and missing required metadata.
 ValidationResult ValidateGameDefinition(const GameDefinition& game);
 
 // Validates a user profile against the loaded game catalog and binding rules.
-ValidationResult ValidateProfile(const GameDefinition& game, const ActionMappingProfile& profile);
+ValidationResult ValidateProfile(const GameDefinition& game,
+                                 const ActionMappingProfile& profile,
+                                 int max_combo_buttons = kDefaultMaxComboButtons);
 
 // Reports whether the validation result contains save-blocking errors.
 bool HasBlockingIssues(const ValidationResult& validation);

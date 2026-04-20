@@ -53,6 +53,7 @@ void TestProfileRoundTripsToYaml() {
     profile.class_id = "mage";
     profile.profile_name = "steam-deck";
     profile.complete = true;
+    profile.axis_button_thresholds = trajectory::mapping::BuildDefaultAxisButtonThresholds();
     profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Button("south")}});
     profile.actions.push_back({"move_x", false, {trajectory::mapping::ActionBinding::Axis("leftx", "any")}});
     profile.actions.push_back({"cast_fireball", false, {trajectory::mapping::ActionBinding::Trigger("right_trigger", 0.65f)}});
@@ -64,6 +65,59 @@ void TestProfileRoundTripsToYaml() {
     Expect(loaded.profile_name == "steam-deck", "profile name should round-trip");
     Expect(loaded.actions.size() == 3, "all actions should round-trip");
     Expect(loaded.actions[2].bindings[0].threshold == 0.65f, "trigger thresholds should round-trip");
+}
+
+void TestComboProfileRoundTripsWithAxisButtonThresholds() {
+    trajectory::mapping::ActionMappingProfile profile;
+    profile.schema_version = 1;
+    profile.game_id = "demo";
+    profile.class_id = "mage";
+    profile.profile_name = "steam-deck";
+    profile.complete = true;
+    profile.axis_button_thresholds = trajectory::mapping::BuildDefaultAxisButtonThresholds();
+    profile.axis_button_thresholds[0].threshold = 0.65f;
+    profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Combo({
+                                              trajectory::mapping::ComboComponent::Button("south"),
+                                              trajectory::mapping::ComboComponent::AxisButton("left_trigger", ""),
+                                          })}});
+    profile.actions.push_back({"cast_fireball", false, {trajectory::mapping::ActionBinding::Combo({
+                                                        trajectory::mapping::ComboComponent::AxisButton("leftx", "positive"),
+                                                        trajectory::mapping::ComboComponent::Button("east"),
+                                                    })}});
+
+    const auto path = WriteTempFile("action-mapping-combo-test.yaml", "");
+    trajectory::mapping::SaveActionMappingProfile(profile, path.string());
+    const auto loaded = trajectory::mapping::LoadActionMappingProfile(path.string());
+
+    Expect(loaded.axis_button_thresholds.size() == profile.axis_button_thresholds.size(), "axis button thresholds should round-trip");
+    Expect(trajectory::mapping::ResolveAxisButtonThreshold(loaded, "left_trigger") == 0.65f, "configured axis threshold should round-trip");
+    Expect(loaded.actions[0].bindings[0].type == trajectory::mapping::BindingType::combo, "combo binding should round-trip");
+    Expect(loaded.actions[0].bindings[0].combo_components.size() == 2, "combo members should round-trip");
+    Expect(loaded.actions[1].bindings[0].combo_components[0].direction == "positive", "directional axis combo member should round-trip");
+}
+
+void TestMissingAxisButtonThresholdsDefaultOnLoad() {
+    const auto path = WriteTempFile(
+        "action-mapping-combo-default-thresholds.yaml",
+        "schema_version: 1\n"
+        "game_id: demo\n"
+        "class_id: mage\n"
+        "profile_name: default\n"
+        "complete: true\n"
+        "actions:\n"
+        "  jump:\n"
+        "    bindings:\n"
+        "      - type: combo\n"
+        "        controls:\n"
+        "          - type: button\n"
+        "            control: south\n"
+        "          - type: axis_button\n"
+        "            control: left_trigger\n");
+
+    const auto loaded = trajectory::mapping::LoadActionMappingProfile(path.string());
+
+    Expect(trajectory::mapping::ResolveAxisButtonThreshold(loaded, "left_trigger") == trajectory::mapping::kDefaultAxisButtonThreshold,
+           "missing axis button thresholds should default on load");
 }
 
 void TestInvalidThresholdFailsClearly() {
@@ -97,6 +151,8 @@ int main() {
     trajectory::test_support::DisableWindowsErrorDialogs();
     TestGameDefinitionParsesFromYaml();
     TestProfileRoundTripsToYaml();
+    TestComboProfileRoundTripsWithAxisButtonThresholds();
+    TestMissingAxisButtonThresholdsDefaultOnLoad();
     TestInvalidThresholdFailsClearly();
     return 0;
 }

@@ -14,6 +14,7 @@ struct Options {
     std::string output_path = "action-mapping.yaml";
     std::string profile_name = "default";
     std::string resume_from_path;
+    int max_combo_buttons = 2;
 };
 
 // Returns true when the input contains at least one non-whitespace character.
@@ -29,7 +30,7 @@ inline bool HasNonWhitespace(std::string_view value) {
 // Builds the mapper CLI usage string used in validation failures.
 inline std::string BuildUsage(std::string_view program_name) {
     return "Usage: " + std::string(program_name) +
-           " <game-actions.yaml> [action-mapping.yaml] [--profile-name <name>] [--resume-from <existing.yaml>]";
+           " <game-actions.yaml> [action-mapping.yaml] [--profile-name <name>] [--resume-from <existing.yaml>] [--max-combo-buttons <n>]";
 }
 
 // Parses mapper CLI arguments, applies defaults, and emits usage on invalid input.
@@ -59,6 +60,27 @@ inline bool TryParseArguments(const std::vector<std::string>& args,
                 return false;
             }
             options.resume_from_path = args[index + 1];
+            ++index;
+            continue;
+        }
+        if (args[index] == "--max-combo-buttons") {
+            if (index + 1 >= args.size() || !HasNonWhitespace(args[index + 1])) {
+                error << "Error: max combo buttons must be a positive integer.\n"
+                      << BuildUsage(program_name) << '\n';
+                return false;
+            }
+            try {
+                options.max_combo_buttons = std::stoi(args[index + 1]);
+            } catch (const std::exception&) {
+                error << "Error: max combo buttons must be a positive integer.\n"
+                      << BuildUsage(program_name) << '\n';
+                return false;
+            }
+            if (options.max_combo_buttons <= 0) {
+                error << "Error: max combo buttons must be a positive integer.\n"
+                      << BuildUsage(program_name) << '\n';
+                return false;
+            }
             ++index;
             continue;
         }

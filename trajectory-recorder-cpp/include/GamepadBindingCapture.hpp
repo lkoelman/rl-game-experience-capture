@@ -2,6 +2,8 @@
 
 #include <optional>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 
 #include "ActionMapping.hpp"
 
@@ -34,7 +36,12 @@ public:
     void Stop();
 
     // Polls SDL events and returns the most recently observed binding candidate, if any.
-    std::optional<ObservedBinding> PollBinding(ActionInputKind kind);
+    std::optional<ObservedBinding> PollBinding(ActionInputKind kind,
+                                               const ActionMappingProfile& profile,
+                                               int max_combo_buttons);
+
+    // Returns the most recent non-fatal capture warning, or an empty string when none is active.
+    const std::string& CurrentWarning() const;
 
     // Clears any remembered observed state so the next action starts fresh.
     void ClearObservedBindings();
@@ -42,9 +49,12 @@ public:
 private:
     bool started_{false};
     SDL_Gamepad* gamepad_{nullptr};
+    std::unordered_set<std::string> pressed_buttons_;
+    std::unordered_map<std::string, float> axis_values_;
     std::optional<ObservedBinding> digital_binding_;
     std::optional<ObservedBinding> analog_binding_;
     std::optional<ObservedBinding> trigger_binding_;
+    std::string current_warning_;
 };
 
 }  // namespace trajectory::mapping

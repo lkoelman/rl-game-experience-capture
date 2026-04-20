@@ -54,8 +54,7 @@ std::vector<ActionDefinition> ParseActionList(const YAML::Node& node, const std:
     return actions;
 }
 
-// Parses one saved low-level binding entry from an action mapping profile.
-ActionBinding ParseBinding(const YAML::Node& node, const std::string& path) {
+ComboComponent ParseComboComponent(const YAML::Node& node, const std::string& path) {
     if (!node["type"] || !node["control"]) {
         throw std::runtime_error(path + " must contain type and control");
     }
@@ -63,12 +62,33 @@ ActionBinding ParseBinding(const YAML::Node& node, const std::string& path) {
     const std::string type = node["type"].as<std::string>();
     const std::string control = node["control"].as<std::string>();
     if (type == "button") {
+        return ComboComponent::Button(control);
+    }
+    if (type == "axis_button") {
+        return ComboComponent::AxisButton(control, node["direction"] ? node["direction"].as<std::string>() : "");
+    }
+    throw std::runtime_error(path + " has unknown combo component type: " + type);
+}
+
+// Parses one saved low-level binding entry from an action mapping profile.
+ActionBinding ParseBinding(const YAML::Node& node, const std::string& path) {
+    if (!node["type"] || !node["control"]) {
+        if (!(node["type"] && node["type"].as<std::string>() == "combo")) {
+            throw std::runtime_error(path + " must contain type and control");
+        }
+    }
+
+    const std::string type = node["type"].as<std::string>();
+    if (type == "button") {
+        const std::string control = node["control"].as<std::string>();
         return ActionBinding::Button(control);
     }
     if (type == "axis") {
+        const std::string control = node["control"].as<std::string>();
         return ActionBinding::Axis(control, node["direction"] ? node["direction"].as<std::string>() : "any");
     }
     if (type == "trigger") {
+        const std::string control = node["control"].as<std::string>();
         if (!node["threshold"]) {
             throw std::runtime_error(path + " threshold is required for trigger bindings");
         }
@@ -77,6 +97,18 @@ ActionBinding ParseBinding(const YAML::Node& node, const std::string& path) {
             throw std::runtime_error(path + " threshold must be within (0, 1]");
         }
         return ActionBinding::Trigger(control, threshold);
+    }
+    if (type == "combo") {
+        const YAML::Node controls = node["controls"];
+        if (!controls || !controls.IsSequence()) {
+            throw std::runtime_error(path + " controls must be a sequence");
+        }
+        std::vector<ComboComponent> components;
+        components.reserve(controls.size());
+        for (std::size_t index = 0; index < controls.size(); ++index) {
+            components.push_back(ParseComboComponent(controls[index], path + ".controls[" + std::to_string(index) + "]"));
+        }
+        return ActionBinding::Combo(std::move(components));
     }
 
     throw std::runtime_error(path + " has unknown binding type: " + type);
@@ -91,6 +123,18 @@ std::string BindingTypeName(BindingType type) {
         return "axis";
     case BindingType::trigger:
         return "trigger";
+    case BindingType::combo:
+        return "combo";
+    }
+    return "button";
+}
+
+std::string ComboComponentTypeName(ComboComponentType type) {
+    switch (type) {
+    case ComboComponentType::button:
+        return "button";
+    case ComboComponentType::axis_button:
+        return "axis_button";
     }
     return "button";
 }
@@ -144,6 +188,19 @@ ActionMappingProfile LoadActionMappingProfile(const std::string& path) {
     profile.created_at = root["created_at"] ? root["created_at"].as<std::string>() : "";
     profile.updated_at = root["updated_at"] ? root["updated_at"].as<std::string>() : "";
     profile.complete = root["complete"] ? root["complete"].as<bool>() : false;
+    const YAML::Node thresholds_node = root["axis_button_thresholds"];
+    if (thresholds_node) {
+        if (!thresholds_node.IsMap()) {
+            throw std::runtime_error("axis_button_thresholds must be a map keyed by axis control");
+        }
+        for (const auto& item : thresholds_node) {
+            profile.axis_button_thresholds.push_back(AxisButtonThreshold{
+                item.first.as<std::string>(),
+                item.second.as<float>(),
+            });
+        }
+    }
+    profile.axis_button_thresholds = NormalizeAxisButtonThresholds(profile.axis_button_thresholds);
 
     const YAML::Node actions_node = root["actions"];
     if (actions_node) {
@@ -184,6 +241,11 @@ void SaveActionMappingProfile(const ActionMappingProfile& profile, const std::st
         out << YAML::Key << "updated_at" << YAML::Value << profile.updated_at;
     }
     out << YAML::Key << "complete" << YAML::Value << profile.complete;
+    out << YAML::Key << "axis_button_thresholds" << YAML::Value << YAML::BeginMap;
+    for (const auto& threshold : NormalizeAxisButtonThresholds(profile.axis_button_thresholds)) {
+        out << YAML::Key << threshold.control << YAML::Value << threshold.threshold;
+    }
+    out << YAML::EndMap;
     out << YAML::Key << "actions" << YAML::Value << YAML::BeginMap;
     for (const auto& action : profile.actions) {
         out << YAML::Key << action.action_id << YAML::Value << YAML::BeginMap;
@@ -192,12 +254,27 @@ void SaveActionMappingProfile(const ActionMappingProfile& profile, const std::st
         for (const auto& binding : action.bindings) {
             out << YAML::BeginMap;
             out << YAML::Key << "type" << YAML::Value << BindingTypeName(binding.type);
-            out << YAML::Key << "control" << YAML::Value << binding.control;
+            if (binding.type == BindingType::button || binding.type == BindingType::axis || binding.type == BindingType::trigger) {
+                out << YAML::Key << "control" << YAML::Value << binding.control;
+            }
             if (binding.type == BindingType::axis) {
                 out << YAML::Key << "direction" << YAML::Value << binding.direction;
             }
             if (binding.type == BindingType::trigger) {
                 out << YAML::Key << "threshold" << YAML::Value << binding.threshold;
+            }
+            if (binding.type == BindingType::combo) {
+                out << YAML::Key << "controls" << YAML::Value << YAML::BeginSeq;
+                for (const auto& component : binding.combo_components) {
+                    out << YAML::BeginMap;
+                    out << YAML::Key << "type" << YAML::Value << ComboComponentTypeName(component.type);
+                    out << YAML::Key << "control" << YAML::Value << component.control;
+                    if (component.type == ComboComponentType::axis_button && !component.direction.empty()) {
+                        out << YAML::Key << "direction" << YAML::Value << component.direction;
+                    }
+                    out << YAML::EndMap;
+                }
+                out << YAML::EndSeq;
             }
             out << YAML::EndMap;
         }

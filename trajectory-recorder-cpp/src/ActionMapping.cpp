@@ -35,9 +35,34 @@ const std::unordered_set<std::string>& ValidTriggers() {
     return controls;
 }
 
+const std::vector<std::string>& EligibleAxisButtons() {
+    static const std::vector<std::string> controls{
+        "left_trigger", "leftx", "lefty", "right_trigger", "rightx", "righty",
+    };
+    return controls;
+}
+
 // Validates the serialized axis direction token used in YAML profiles.
 bool IsValidDirection(const std::string& direction) {
     return direction == "negative" || direction == "positive" || direction == "any";
+}
+
+bool IsDirectionalAxisButton(const std::string& control) {
+    return ValidAxes().contains(control);
+}
+
+bool IsTriggerAxisButton(const std::string& control) {
+    return ValidTriggers().contains(control);
+}
+
+std::string ComboComponentConflictKey(const ComboComponent& component) {
+    switch (component.type) {
+    case ComboComponentType::button:
+        return "button:" + component.control;
+    case ComboComponentType::axis_button:
+        return "axis_button:" + component.control + ":" + component.direction;
+    }
+    return {};
 }
 
 // Canonicalizes a binding into the key used for duplicate/conflict detection.
@@ -49,6 +74,24 @@ std::string BindingConflictKey(const ActionBinding& binding) {
         return "axis:" + binding.control + ":" + binding.direction;
     case BindingType::trigger:
         return "trigger:" + binding.control;
+    case BindingType::combo: {
+        std::vector<std::string> component_keys;
+        component_keys.reserve(binding.combo_components.size());
+        for (const auto& component : binding.combo_components) {
+            component_keys.push_back(ComboComponentConflictKey(component));
+        }
+        std::sort(component_keys.begin(), component_keys.end());
+
+        std::ostringstream key;
+        key << "combo:";
+        for (std::size_t index = 0; index < component_keys.size(); ++index) {
+            if (index > 0) {
+                key << "+";
+            }
+            key << component_keys[index];
+        }
+        return key.str();
+    }
     }
     return {};
 }
@@ -60,6 +103,21 @@ void AddIssue(ValidationResult& result, ValidationSeverity severity, std::string
 }
 
 }  // namespace
+
+ComboComponent ComboComponent::Button(std::string control_name) {
+    ComboComponent component;
+    component.type = ComboComponentType::button;
+    component.control = std::move(control_name);
+    return component;
+}
+
+ComboComponent ComboComponent::AxisButton(std::string control_name, std::string direction_name) {
+    ComboComponent component;
+    component.type = ComboComponentType::axis_button;
+    component.control = std::move(control_name);
+    component.direction = std::move(direction_name);
+    return component;
+}
 
 ActionBinding ActionBinding::Button(std::string control_name) {
     ActionBinding binding;
@@ -84,6 +142,13 @@ ActionBinding ActionBinding::Trigger(std::string control_name, float activation_
     return binding;
 }
 
+ActionBinding ActionBinding::Combo(std::vector<ComboComponent> components) {
+    ActionBinding binding;
+    binding.type = BindingType::combo;
+    binding.combo_components = std::move(components);
+    return binding;
+}
+
 const ClassDefinition* FindClassDefinition(const GameDefinition& game, const std::string& class_id) {
     for (const auto& klass : game.classes) {
         if (klass.id == class_id) {
@@ -100,6 +165,41 @@ std::vector<ActionDefinition> CollectActions(const GameDefinition& game, const s
     }
 
     return klass->actions;
+}
+
+std::vector<AxisButtonThreshold> BuildDefaultAxisButtonThresholds() {
+    std::vector<AxisButtonThreshold> thresholds;
+    thresholds.reserve(EligibleAxisButtons().size());
+    for (const auto& control : EligibleAxisButtons()) {
+        thresholds.push_back(AxisButtonThreshold{control, kDefaultAxisButtonThreshold});
+    }
+    return thresholds;
+}
+
+std::vector<AxisButtonThreshold> NormalizeAxisButtonThresholds(const std::vector<AxisButtonThreshold>& thresholds) {
+    std::unordered_map<std::string, float> threshold_map;
+    for (const auto& threshold : thresholds) {
+        threshold_map[threshold.control] = threshold.threshold;
+    }
+
+    std::vector<AxisButtonThreshold> normalized;
+    normalized.reserve(EligibleAxisButtons().size());
+    for (const auto& control : EligibleAxisButtons()) {
+        const auto it = threshold_map.find(control);
+        normalized.push_back(AxisButtonThreshold{
+            control,
+            it == threshold_map.end() ? kDefaultAxisButtonThreshold : it->second,
+        });
+    }
+    return normalized;
+}
+
+float ResolveAxisButtonThreshold(const ActionMappingProfile& profile, const std::string& control) {
+    const auto normalized = NormalizeAxisButtonThresholds(profile.axis_button_thresholds);
+    const auto it = std::find_if(normalized.begin(), normalized.end(), [&](const AxisButtonThreshold& threshold) {
+        return threshold.control == control;
+    });
+    return it == normalized.end() ? kDefaultAxisButtonThreshold : it->threshold;
 }
 
 ValidationResult ValidateGameDefinition(const GameDefinition& game) {
@@ -129,7 +229,7 @@ ValidationResult ValidateGameDefinition(const GameDefinition& game) {
     return result;
 }
 
-ValidationResult ValidateProfile(const GameDefinition& game, const ActionMappingProfile& profile) {
+ValidationResult ValidateProfile(const GameDefinition& game, const ActionMappingProfile& profile, int max_combo_buttons) {
     ValidationResult result = ValidateGameDefinition(game);
 
     if (profile.game_id != game.game_id) {
@@ -151,6 +251,19 @@ ValidationResult ValidateProfile(const GameDefinition& game, const ActionMapping
 
     std::unordered_map<std::string, std::string> used_bindings;
     std::unordered_set<std::string> seen_actions;
+    std::unordered_set<std::string> seen_threshold_controls;
+    for (const auto& threshold : profile.axis_button_thresholds) {
+        if (!ValidAxes().contains(threshold.control) && !ValidTriggers().contains(threshold.control)) {
+            AddIssue(result, ValidationSeverity::error, "", "unknown axis button threshold control: " + threshold.control);
+        }
+        if (!seen_threshold_controls.insert(threshold.control).second) {
+            AddIssue(result, ValidationSeverity::error, "", "duplicate axis button threshold control: " + threshold.control);
+        }
+        if (threshold.threshold <= 0.0f || threshold.threshold > 1.0f) {
+            AddIssue(result, ValidationSeverity::error, "", "axis button threshold must be within (0, 1] for control: " + threshold.control);
+        }
+    }
+
     for (const auto& action : profile.actions) {
         if (!seen_actions.insert(action.action_id).second) {
             AddIssue(result, ValidationSeverity::error, action.action_id, "duplicate action mapping entry: " + action.action_id);
@@ -186,6 +299,51 @@ ValidationResult ValidateProfile(const GameDefinition& game, const ActionMapping
                     AddIssue(result, ValidationSeverity::error, action.action_id, "trigger threshold must be within (0, 1]");
                 }
                 break;
+            case BindingType::combo: {
+                if (binding.combo_components.empty()) {
+                    AddIssue(result, ValidationSeverity::error, action.action_id, "combo binding must contain at least one component");
+                    break;
+                }
+                if (static_cast<int>(binding.combo_components.size()) > max_combo_buttons) {
+                    AddIssue(result,
+                             ValidationSeverity::error,
+                             action.action_id,
+                             "combo exceeds maximum simultaneous controls (" + std::to_string(max_combo_buttons) + ")");
+                }
+
+                std::unordered_set<std::string> seen_components;
+                for (const auto& component : binding.combo_components) {
+                    const std::string component_key = ComboComponentConflictKey(component);
+                    if (!seen_components.insert(component_key).second) {
+                        AddIssue(result, ValidationSeverity::error, action.action_id, "duplicate combo member: " + component.control);
+                    }
+
+                    switch (component.type) {
+                    case ComboComponentType::button:
+                        if (!ValidButtons().contains(component.control)) {
+                            AddIssue(result, ValidationSeverity::error, action.action_id, "unknown combo button control: " + component.control);
+                        }
+                        if (!component.direction.empty()) {
+                            AddIssue(result, ValidationSeverity::error, action.action_id, "button combo member must not declare a direction");
+                        }
+                        break;
+                    case ComboComponentType::axis_button:
+                        if (!IsDirectionalAxisButton(component.control) && !IsTriggerAxisButton(component.control)) {
+                            AddIssue(result, ValidationSeverity::error, action.action_id, "unknown axis button control: " + component.control);
+                            break;
+                        }
+                        if (IsDirectionalAxisButton(component.control)) {
+                            if (component.direction != "negative" && component.direction != "positive") {
+                                AddIssue(result, ValidationSeverity::error, action.action_id, "axis button combo member requires direction: " + component.control);
+                            }
+                        } else if (!component.direction.empty()) {
+                            AddIssue(result, ValidationSeverity::error, action.action_id, "trigger axis button combo member must not declare a direction");
+                        }
+                        break;
+                    }
+                }
+                break;
+            }
             }
 
             const std::string key = BindingConflictKey(binding);
@@ -194,7 +352,7 @@ ValidationResult ValidateProfile(const GameDefinition& game, const ActionMapping
                 AddIssue(result,
                          ValidationSeverity::error,
                          action.action_id,
-                         "binding conflict for " + binding.control + " between actions \"" + used_it->second + "\" and \"" + action.action_id + "\"");
+                         "binding conflict for " + DescribeBinding(binding) + " between actions \"" + used_it->second + "\" and \"" + action.action_id + "\"");
             } else {
                 used_bindings.emplace(key, action.action_id);
             }
@@ -232,6 +390,23 @@ std::string DescribeBinding(const ActionBinding& binding) {
         break;
     case BindingType::trigger:
         description << "trigger:" << binding.control << " threshold=" << binding.threshold;
+        break;
+    case BindingType::combo:
+        description << "combo:";
+        for (std::size_t index = 0; index < binding.combo_components.size(); ++index) {
+            const auto& component = binding.combo_components[index];
+            if (index > 0) {
+                description << "+";
+            }
+            if (component.type == ComboComponentType::button) {
+                description << "button:" << component.control;
+            } else {
+                description << "axis_button:" << component.control;
+                if (!component.direction.empty()) {
+                    description << ":" << component.direction;
+                }
+            }
+        }
         break;
     }
     return description.str();

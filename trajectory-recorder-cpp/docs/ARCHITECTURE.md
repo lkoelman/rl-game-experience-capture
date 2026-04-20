@@ -387,7 +387,7 @@ Responsibilities:
 
 - represent game action definitions grouped by class
 - represent per-user mapping profiles
-- represent binding variants for buttons, analog axes, and thresholded triggers
+- represent binding variants for buttons, analog axes, thresholded triggers, and simultaneous button combos
 - validate game definitions and mapping profiles
 - provide a deterministic workflow state model for tests and the TUI flow
 
@@ -402,7 +402,7 @@ Responsibilities:
 
 - load `game-actions.yaml`
 - load/write `action-mapping.yaml`
-- enforce the expected YAML structure and binding field semantics
+- enforce the expected YAML structure and binding field semantics, including top-level axis-button thresholds and combo bindings
 
 ### Gamepad Binding Capture
 
@@ -418,9 +418,10 @@ Responsibilities:
 Important current behavior:
 
 - SDL event polling stays on the mapper thread; the workflow posts periodic FTXUI custom events and polls the latest observed binding without blocking the UI
-- digital actions observe the currently pressed gamepad button in real time
+- digital actions observe the last remembered simultaneous control set in real time
 - analog actions accept joystick axes and store them as explicit per-axis bindings
 - trigger actions store a threshold derived from the observed trigger press
+- digital combo candidates can include physical buttons plus axis-as-button members gated by top-level profile thresholds
 - transient observed bindings are cleared when the operator changes actions or confirms a capture
 
 ### Mapping Workflow
@@ -433,12 +434,13 @@ Files:
 
 Responsibilities:
 
-- prompt for class selection
+- prompt for a startup mode selection before class selection
+- optionally edit top-level axis thresholds before mapping begins
 - preload an optional existing mapping profile for the selected class
 - guide the user through action-by-action mapping with FTXUI
 - render a two-column layout with the current action dialog on the left and an action-status `Menu` on the right
 - support keyboard-driven navigation:
-  - `Space` confirms the currently observed binding
+  - `Space` confirms the last observed binding or combo
   - `Right` advances to the next action, skipping if the current action has no bindings
   - `Left` returns to the previous action
   - `Enter` exits the mapping screen into a review/save screen

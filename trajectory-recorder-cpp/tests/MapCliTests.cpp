@@ -66,6 +66,22 @@ void TestResumeFromParsesAlongsideOutputPath() {
     Expect(options.resume_from_path == "existing.yaml", "resume path should be preserved");
 }
 
+void TestMaxComboButtonsParses() {
+    trajectory::map_cli::Options options;
+    std::ostringstream output;
+    std::ostringstream error;
+    const std::vector<std::string> args{
+        "game-actions.yaml",
+        "--max-combo-buttons",
+        "3",
+    };
+
+    const bool ok = trajectory::map_cli::TryParseArguments(args, "map_actions", options, output, error);
+
+    Expect(ok, "max combo buttons should parse");
+    Expect(options.max_combo_buttons == 3, "max combo buttons should be preserved");
+}
+
 void TestMissingGameDefinitionFailsClearly() {
     trajectory::map_cli::Options options;
     std::ostringstream output;
@@ -105,6 +121,19 @@ void TestMissingResumePathFailsClearly() {
            "error should explain the invalid resume path");
 }
 
+void TestInvalidMaxComboButtonsFailsClearly() {
+    trajectory::map_cli::Options options;
+    std::ostringstream output;
+    std::ostringstream error;
+    const std::vector<std::string> args{"game-actions.yaml", "--max-combo-buttons", "0"};
+
+    const bool ok = trajectory::map_cli::TryParseArguments(args, "map_actions", options, output, error);
+
+    Expect(!ok, "non-positive max combo buttons should fail");
+    Expect(error.str().find("max combo buttons must be a positive integer") != std::string::npos,
+           "error should explain the invalid max combo button value");
+}
+
 }  // namespace
 
 int main() {
@@ -112,8 +141,10 @@ int main() {
     TestDefaultsAreApplied();
     TestOptionalArgumentsParse();
     TestResumeFromParsesAlongsideOutputPath();
+    TestMaxComboButtonsParses();
     TestMissingGameDefinitionFailsClearly();
     TestBlankProfileNameFailsClearly();
     TestMissingResumePathFailsClearly();
+    TestInvalidMaxComboButtonsFailsClearly();
     return 0;
 }

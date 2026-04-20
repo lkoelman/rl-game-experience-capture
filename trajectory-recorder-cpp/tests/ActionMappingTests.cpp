@@ -131,6 +131,95 @@ void TestWorkflowNavigationSupportsPreviousAndRightArrowSkipBehavior() {
     Expect(workflow.ActionStates()[1].bindings[0].control == "leftx", "existing bindings should remain intact when navigating");
 }
 
+void TestValidationFindsDuplicateComboBindingsAcrossActions() {
+    const auto game = BuildGameDefinition();
+
+    trajectory::mapping::ActionMappingProfile profile;
+    profile.game_id = "demo";
+    profile.class_id = "mage";
+    profile.profile_name = "default";
+    profile.axis_button_thresholds = trajectory::mapping::BuildDefaultAxisButtonThresholds();
+    profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Combo({
+                                              trajectory::mapping::ComboComponent::Button("south"),
+                                              trajectory::mapping::ComboComponent::Button("left_shoulder"),
+                                          })}});
+    profile.actions.push_back({"cast_fireball", false, {trajectory::mapping::ActionBinding::Combo({
+                                                        trajectory::mapping::ComboComponent::Button("left_shoulder"),
+                                                        trajectory::mapping::ComboComponent::Button("south"),
+                                                    })}});
+
+    const auto validation = trajectory::mapping::ValidateProfile(game, profile);
+
+    Expect(!validation.ok, "duplicate combo bindings should fail validation");
+    bool found_duplicate = false;
+    for (const auto& issue : validation.issues) {
+        if (issue.message.find("left_shoulder") != std::string::npos && issue.message.find("south") != std::string::npos) {
+            found_duplicate = true;
+            break;
+        }
+    }
+    Expect(found_duplicate, "duplicate combo message should name the conflicting controls");
+}
+
+void TestValidationRejectsOversizedAndDuplicateComboMembers() {
+    const auto game = BuildGameDefinition();
+
+    trajectory::mapping::ActionMappingProfile profile;
+    profile.game_id = "demo";
+    profile.class_id = "mage";
+    profile.profile_name = "default";
+    profile.axis_button_thresholds = trajectory::mapping::BuildDefaultAxisButtonThresholds();
+    profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Combo({
+                                              trajectory::mapping::ComboComponent::Button("south"),
+                                              trajectory::mapping::ComboComponent::Button("east"),
+                                          })}});
+    profile.actions.push_back({"cast_fireball", false, {trajectory::mapping::ActionBinding::Combo({
+                                                        trajectory::mapping::ComboComponent::Button("south"),
+                                                        trajectory::mapping::ComboComponent::Button("south"),
+                                                    })}});
+
+    const auto validation = trajectory::mapping::ValidateProfile(game, profile, 1);
+
+    Expect(!validation.ok, "oversized or duplicate combo members should fail validation");
+    bool found_size_issue = false;
+    bool found_duplicate_member = false;
+    for (const auto& issue : validation.issues) {
+        if (issue.message.find("maximum") != std::string::npos) {
+            found_size_issue = true;
+        }
+        if (issue.message.find("duplicate combo member") != std::string::npos) {
+            found_duplicate_member = true;
+        }
+    }
+    Expect(found_size_issue, "oversized combo should report the configured maximum");
+    Expect(found_duplicate_member, "duplicate combo members should be rejected");
+}
+
+void TestValidationAcceptsDirectionalAxisButtonsInCombos() {
+    const auto game = BuildGameDefinition();
+
+    trajectory::mapping::ActionMappingProfile profile;
+    profile.game_id = "demo";
+    profile.class_id = "mage";
+    profile.profile_name = "default";
+    profile.axis_button_thresholds = trajectory::mapping::BuildDefaultAxisButtonThresholds();
+    profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Combo({
+                                              trajectory::mapping::ComboComponent::AxisButton("leftx", "positive"),
+                                              trajectory::mapping::ComboComponent::Button("south"),
+                                          })}});
+
+    const auto validation = trajectory::mapping::ValidateProfile(game, profile);
+
+    bool found_error = false;
+    for (const auto& issue : validation.issues) {
+        if (issue.severity == trajectory::mapping::ValidationSeverity::error) {
+            found_error = true;
+            break;
+        }
+    }
+    Expect(!found_error, "directional axis button combos should be accepted");
+}
+
 }  // namespace
 
 int main() {
@@ -141,5 +230,8 @@ int main() {
     TestWorkflowSupportsSkipConfirmAndEdit();
     TestWorkflowPreloadsExistingMappingsAndStartsAtFirstUnresolvedAction();
     TestWorkflowNavigationSupportsPreviousAndRightArrowSkipBehavior();
+    TestValidationFindsDuplicateComboBindingsAcrossActions();
+    TestValidationRejectsOversizedAndDuplicateComboMembers();
+    TestValidationAcceptsDirectionalAxisButtonsInCombos();
     return 0;
 }

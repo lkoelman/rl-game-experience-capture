@@ -68,12 +68,14 @@ bool BindingsEqual(const ActionBinding& left, const ActionBinding& right) {
     return left.type == right.type &&
            left.control == right.control &&
            left.direction == right.direction &&
-           left.threshold == right.threshold;
+           left.threshold == right.threshold &&
+           left.combo_components == right.combo_components;
 }
 
 std::optional<std::size_t> PromptForSelection(const std::string& title,
                                               const std::vector<std::string>& labels,
-                                              int initial_selection = 0) {
+                                              int initial_selection = 0,
+                                              const std::string& help_text = "Use arrow keys and Enter. Press q or Esc to cancel.") {
     if (labels.empty()) {
         return std::nullopt;
     }
@@ -101,7 +103,7 @@ std::optional<std::size_t> PromptForSelection(const std::string& title,
         return vbox({
                    text(title) | bold,
                    separator(),
-                   WrappedLine("Use arrow keys and Enter. Press q or Esc to cancel."),
+                   WrappedLine(help_text),
                    separator(),
                    component->Render(),
                }) |
@@ -113,6 +115,102 @@ std::optional<std::size_t> PromptForSelection(const std::string& title,
         return std::nullopt;
     }
     return static_cast<std::size_t>(selected);
+}
+
+enum class StartupChoice {
+    start_mapping,
+    configure_thresholds,
+    cancel,
+};
+
+std::optional<StartupChoice> PromptForStartupChoice() {
+    const std::vector<std::string> labels{
+        "Start action mapping",
+        "Configure axis thresholds",
+        "Cancel",
+    };
+    const auto selection = PromptForSelection("Choose mapper mode", labels, 0, "Select the next step before class selection.");
+    if (!selection.has_value()) {
+        return std::nullopt;
+    }
+    switch (*selection) {
+    case 0:
+        return StartupChoice::start_mapping;
+    case 1:
+        return StartupChoice::configure_thresholds;
+    default:
+        return StartupChoice::cancel;
+    }
+}
+
+bool EditAxisThresholds(ActionMappingProfile& profile) {
+    profile.axis_button_thresholds = NormalizeAxisButtonThresholds(profile.axis_button_thresholds);
+    std::vector<AxisButtonThreshold> working_thresholds = profile.axis_button_thresholds;
+
+    std::vector<std::string> labels;
+    labels.reserve(working_thresholds.size());
+    for (const auto& threshold : working_thresholds) {
+        labels.push_back(threshold.control);
+    }
+
+    int selected = 0;
+    bool saved = false;
+    auto screen = ftxui::ScreenInteractive::TerminalOutput();
+    auto menu = ftxui::Menu(&labels, &selected);
+    auto component = ftxui::CatchEvent(menu, [&](ftxui::Event event) {
+        if (event == ftxui::Event::Return) {
+            saved = true;
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        if (event == ftxui::Event::Escape || (event.is_character() && event.character() == "q")) {
+            saved = false;
+            screen.ExitLoopClosure()();
+            return true;
+        }
+        if (event == ftxui::Event::ArrowLeft && !working_thresholds.empty()) {
+            auto& threshold = working_thresholds[static_cast<std::size_t>(selected)];
+            threshold.threshold = std::max(0.05f, threshold.threshold - 0.05f);
+            return true;
+        }
+        if (event == ftxui::Event::ArrowRight && !working_thresholds.empty()) {
+            auto& threshold = working_thresholds[static_cast<std::size_t>(selected)];
+            threshold.threshold = std::min(1.0f, threshold.threshold + 0.05f);
+            return true;
+        }
+        return false;
+    });
+
+    auto renderer = ftxui::Renderer(component, [&] {
+        using namespace ftxui;
+
+        Elements values;
+        for (std::size_t index = 0; index < working_thresholds.size(); ++index) {
+            const auto& threshold = working_thresholds[index];
+            std::ostringstream value;
+            value << std::fixed << std::setprecision(2) << threshold.threshold;
+            values.push_back(text(threshold.control + ": " + value.str()));
+        }
+
+        return vbox({
+                   text("Configure axis thresholds") | bold,
+                   separator(),
+                   WrappedLine("Left/Right adjust the selected axis threshold. Enter saves. q or Esc cancels."),
+                   separator(),
+                   hbox({
+                       component->Render() | flex,
+                       separator(),
+                       vbox(std::move(values)) | flex,
+                   }),
+               }) |
+               border;
+    });
+
+    screen.Loop(renderer);
+    if (saved) {
+        profile.axis_button_thresholds = NormalizeAxisButtonThresholds(working_thresholds);
+    }
+    return saved;
 }
 
 std::vector<ProfileActionMapping> ExistingActionsForClass(const GameDefinition& game,
@@ -131,6 +229,7 @@ ActionMappingProfile BuildProfile(const GameDefinition& game,
                                   const std::string& class_id,
                                   const std::string& profile_name,
                                   const MappingWorkflowState& workflow,
+                                  const ActionMappingProfile& working_profile_seed,
                                   const ActionMappingProfile* existing_profile) {
     const std::string now = CurrentTimestampUtc();
 
@@ -143,10 +242,9 @@ ActionMappingProfile BuildProfile(const GameDefinition& game,
                              ? existing_profile->created_at
                              : now;
     profile.updated_at = now;
+    profile.complete = false;
+    profile.axis_button_thresholds = NormalizeAxisButtonThresholds(working_profile_seed.axis_button_thresholds);
     profile.actions = workflow.BuildProfileActions();
-    profile.complete = std::all_of(profile.actions.begin(), profile.actions.end(), [](const ProfileActionMapping& action) {
-        return action.skipped || !action.bindings.empty();
-    });
     return profile;
 }
 
@@ -158,8 +256,9 @@ struct ReviewChoice {
 
 ReviewChoice RunReviewScreen(const GameDefinition& game,
                              const MappingWorkflowState& workflow,
-                             const ActionMappingProfile& profile) {
-    const ValidationResult validation = ValidateProfile(game, profile);
+                             const ActionMappingProfile& profile,
+                             int max_combo_buttons) {
+    const ValidationResult validation = ValidateProfile(game, profile, max_combo_buttons);
 
     std::vector<std::string> labels;
     labels.reserve(workflow.TotalActions() + 2);
@@ -231,12 +330,15 @@ enum class MappingScreenResult {
     review,
 };
 
-MappingScreenResult RunMappingScreen(MappingWorkflowState& workflow, GamepadBindingCapture& capture) {
+MappingScreenResult RunMappingScreen(MappingWorkflowState& workflow,
+                                     GamepadBindingCapture& capture,
+                                     const ActionMappingProfile& working_profile_seed,
+                                     int max_combo_buttons) {
     if (workflow.IsFinished()) {
         return MappingScreenResult::review;
     }
 
-    std::string status = "Space confirms the last observed binding. Right advances or skips. Left goes back. Enter opens review/save.";
+    std::string status = "Space confirms the last observed binding. c clears current bindings. Right advances or skips. Left goes back. Enter opens review/save.";
     std::optional<ObservedBinding> observed;
     std::vector<std::string> menu_entries;
     int selected = static_cast<int>(workflow.CurrentIndex());
@@ -323,7 +425,10 @@ MappingScreenResult RunMappingScreen(MappingWorkflowState& workflow, GamepadBind
             if (workflow.IsFinished()) {
                 return true;
             }
-            observed = capture.PollBinding(workflow.CurrentAction().kind);
+            observed = capture.PollBinding(workflow.CurrentAction().kind, working_profile_seed, max_combo_buttons);
+            if (!capture.CurrentWarning().empty()) {
+                status = capture.CurrentWarning();
+            }
             refresh_entries();
             return true;
         }
@@ -341,6 +446,12 @@ MappingScreenResult RunMappingScreen(MappingWorkflowState& workflow, GamepadBind
             workflow.MoveToPreviousAction();
             capture.ClearObservedBindings();
             observed.reset();
+            refresh_entries();
+            return true;
+        }
+        if (event.is_character() && event.character() == "c") {
+            workflow.ClearCurrentActionBindings();
+            status = "Cleared mapped bindings for this action.";
             refresh_entries();
             return true;
         }
@@ -394,9 +505,6 @@ MappingScreenResult RunMappingScreen(MappingWorkflowState& workflow, GamepadBind
     if (cancelled) {
         return MappingScreenResult::cancelled;
     }
-    if (workflow.IsFinished()) {
-        return MappingScreenResult::review;
-    }
     return MappingScreenResult::review;
 }
 
@@ -405,52 +513,72 @@ MappingScreenResult RunMappingScreen(MappingWorkflowState& workflow, GamepadBind
 std::optional<ActionMappingProfile> RunMappingWorkflow(const GameDefinition& game,
                                                        GamepadBindingCapture& capture,
                                                        const std::string& profile_name,
+                                                       int max_combo_buttons,
                                                        const ActionMappingProfile* existing_profile) {
-    std::vector<std::string> class_labels;
-    class_labels.reserve(game.classes.size());
-    int initial_selection = 0;
-    for (std::size_t index = 0; index < game.classes.size(); ++index) {
-        const auto& klass = game.classes[index];
-        class_labels.push_back(klass.label + " (" + klass.id + ")");
-        if (existing_profile != nullptr && existing_profile->class_id == klass.id) {
-            initial_selection = static_cast<int>(index);
-        }
-    }
-
-    const auto class_selection = PromptForSelection("Select a class", class_labels, initial_selection);
-    if (!class_selection.has_value()) {
-        return std::nullopt;
-    }
-
-    const ClassDefinition& klass = game.classes[*class_selection];
-    const ActionMappingProfile* class_existing_profile =
-        existing_profile != nullptr && existing_profile->class_id == klass.id ? existing_profile : nullptr;
-    MappingWorkflowState workflow(CollectActions(game, klass.id), ExistingActionsForClass(game, klass.id, class_existing_profile));
+    ActionMappingProfile working_profile_seed;
+    working_profile_seed.schema_version = existing_profile != nullptr ? existing_profile->schema_version : 1;
+    working_profile_seed.game_id = game.game_id;
+    working_profile_seed.profile_name = profile_name;
+    working_profile_seed.axis_button_thresholds = existing_profile != nullptr
+                                                     ? NormalizeAxisButtonThresholds(existing_profile->axis_button_thresholds)
+                                                     : BuildDefaultAxisButtonThresholds();
 
     for (;;) {
-        if (!workflow.IsFinished()) {
-            const MappingScreenResult mapping_result = RunMappingScreen(workflow, capture);
-            if (mapping_result == MappingScreenResult::cancelled) {
-                return std::nullopt;
+        const auto startup_choice = PromptForStartupChoice();
+        if (!startup_choice.has_value() || *startup_choice == StartupChoice::cancel) {
+            return std::nullopt;
+        }
+        if (*startup_choice == StartupChoice::configure_thresholds) {
+            static_cast<void>(EditAxisThresholds(working_profile_seed));
+            continue;
+        }
+
+        std::vector<std::string> class_labels;
+        class_labels.reserve(game.classes.size());
+        int initial_selection = 0;
+        for (std::size_t index = 0; index < game.classes.size(); ++index) {
+            const auto& klass = game.classes[index];
+            class_labels.push_back(klass.label + " (" + klass.id + ")");
+            if (existing_profile != nullptr && existing_profile->class_id == klass.id) {
+                initial_selection = static_cast<int>(index);
             }
         }
 
-        ActionMappingProfile profile = BuildProfile(game, klass.id, profile_name, workflow, class_existing_profile);
-        const ReviewChoice review = RunReviewScreen(game, workflow, profile);
-        if (review.cancelled) {
+        const auto class_selection = PromptForSelection("Select a class", class_labels, initial_selection);
+        if (!class_selection.has_value()) {
             return std::nullopt;
         }
-        if (review.save) {
-            return profile;
+
+        const ClassDefinition& klass = game.classes[*class_selection];
+        const ActionMappingProfile* class_existing_profile =
+            existing_profile != nullptr && existing_profile->class_id == klass.id ? existing_profile : nullptr;
+        MappingWorkflowState workflow(CollectActions(game, klass.id), ExistingActionsForClass(game, klass.id, class_existing_profile));
+
+        for (;;) {
+            if (!workflow.IsFinished()) {
+                const MappingScreenResult mapping_result = RunMappingScreen(workflow, capture, working_profile_seed, max_combo_buttons);
+                if (mapping_result == MappingScreenResult::cancelled) {
+                    return std::nullopt;
+                }
+            }
+
+            ActionMappingProfile profile = BuildProfile(game, klass.id, profile_name, workflow, working_profile_seed, class_existing_profile);
+            const ReviewChoice review = RunReviewScreen(game, workflow, profile, max_combo_buttons);
+            if (review.cancelled) {
+                return std::nullopt;
+            }
+            if (review.save) {
+                return profile;
+            }
+            if (!review.edit_action_id.has_value()) {
+                return std::nullopt;
+            }
+            if (!workflow.SetCurrentActionById(*review.edit_action_id)) {
+                throw std::runtime_error("failed to select action for review: " + *review.edit_action_id);
+            }
+            workflow.ClearCurrentActionBindings();
+            capture.ClearObservedBindings();
         }
-        if (!review.edit_action_id.has_value()) {
-            return std::nullopt;
-        }
-        if (!workflow.SetCurrentActionById(*review.edit_action_id)) {
-            throw std::runtime_error("failed to select action for review: " + *review.edit_action_id);
-        }
-        workflow.ClearCurrentActionBindings();
-        capture.ClearObservedBindings();
     }
 }
 

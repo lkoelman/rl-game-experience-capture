@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <sstream>
 #include <stdexcept>
+#include <vector>
 
 #include <SDL3/SDL.h>
 
@@ -92,6 +94,94 @@ bool IsTriggerAxis(SDL_GamepadAxis axis) {
     return axis == SDL_GAMEPAD_AXIS_LEFT_TRIGGER || axis == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER;
 }
 
+std::string AxisDirection(float value) {
+    return value >= 0.0f ? "positive" : "negative";
+}
+
+bool IsAxisButtonActive(const std::string& control, float value, float threshold) {
+    if (control == "left_trigger" || control == "right_trigger") {
+        return value >= threshold;
+    }
+    return std::fabs(value) >= threshold;
+}
+
+struct DigitalObservation {
+    ObservedBinding observed;
+    std::size_t component_count{0};
+};
+
+DigitalObservation BuildDigitalObservedBinding(const std::unordered_set<std::string>& pressed_buttons,
+                                               const std::unordered_map<std::string, float>& axis_values,
+                                               const ActionMappingProfile& profile,
+                                               int max_combo_buttons,
+                                               std::string& warning) {
+    std::vector<ComboComponent> components;
+    std::vector<std::string> labels;
+
+    for (const auto& button : pressed_buttons) {
+        components.push_back(ComboComponent::Button(button));
+        labels.push_back("button " + button);
+    }
+
+    for (const auto& axis_threshold : NormalizeAxisButtonThresholds(profile.axis_button_thresholds)) {
+        const auto axis_it = axis_values.find(axis_threshold.control);
+        const float value = axis_it == axis_values.end() ? 0.0f : axis_it->second;
+        if (!IsAxisButtonActive(axis_threshold.control, value, axis_threshold.threshold)) {
+            continue;
+        }
+
+        const std::string direction = (axis_threshold.control == "left_trigger" || axis_threshold.control == "right_trigger")
+                                          ? ""
+                                          : AxisDirection(value);
+        components.push_back(ComboComponent::AxisButton(axis_threshold.control, direction));
+        labels.push_back(direction.empty() ? "axis " + axis_threshold.control
+                                           : "axis " + axis_threshold.control + " " + direction);
+    }
+
+    if (components.empty()) {
+        warning.clear();
+        return DigitalObservation{};
+    }
+
+    std::sort(components.begin(), components.end(), [](const ComboComponent& left, const ComboComponent& right) {
+        if (left.control != right.control) {
+            return left.control < right.control;
+        }
+        if (left.direction != right.direction) {
+            return left.direction < right.direction;
+        }
+        return static_cast<int>(left.type) < static_cast<int>(right.type);
+    });
+    std::sort(labels.begin(), labels.end());
+
+    if (static_cast<int>(components.size()) > max_combo_buttons) {
+        warning = "Too many simultaneous controls detected. Maximum allowed is " + std::to_string(max_combo_buttons) + ".";
+        return DigitalObservation{ObservedBinding{}, components.size()};
+    }
+
+    warning.clear();
+
+    std::ostringstream label;
+    for (std::size_t index = 0; index < labels.size(); ++index) {
+        if (index > 0) {
+            label << " + ";
+        }
+        label << labels[index];
+    }
+
+    if (components.size() == 1 && components[0].type == ComboComponentType::button) {
+        return DigitalObservation{
+            ObservedBinding{ActionBinding::Button(components[0].control), label.str()},
+            1,
+        };
+    }
+
+    return DigitalObservation{
+        ObservedBinding{ActionBinding::Combo(std::move(components)), label.str()},
+        components.size(),
+    };
+}
+
 }  // namespace
 
 GamepadBindingCapture::GamepadBindingCapture() = default;
@@ -133,12 +223,17 @@ void GamepadBindingCapture::Stop() {
     started_ = false;
 }
 
-std::optional<ObservedBinding> GamepadBindingCapture::PollBinding(ActionInputKind kind) {
+std::optional<ObservedBinding> GamepadBindingCapture::PollBinding(ActionInputKind kind,
+                                                                  const ActionMappingProfile& profile,
+                                                                  int max_combo_buttons) {
     if (!started_) {
         return std::nullopt;
     }
 
     SDL_Event event;
+    bool digital_state_changed = false;
+    bool saw_release_only_change = false;
+    bool saw_press_like_change = false;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
         case SDL_EVENT_GAMEPAD_ADDED:
@@ -156,13 +251,23 @@ std::optional<ObservedBinding> GamepadBindingCapture::PollBinding(ActionInputKin
         case SDL_EVENT_GAMEPAD_BUTTON_DOWN: {
             const std::string control = ButtonControlName(static_cast<SDL_GamepadButton>(event.gbutton.button));
             if (!control.empty()) {
-                digital_binding_ = ObservedBinding{ActionBinding::Button(control), "button " + control};
+                pressed_buttons_.insert(control);
+                digital_state_changed = true;
+                saw_press_like_change = true;
             }
             break;
         }
-        case SDL_EVENT_GAMEPAD_BUTTON_UP:
-            // Keep the last observed digital binding until a new one replaces it or the workflow clears it.
+        case SDL_EVENT_GAMEPAD_BUTTON_UP: {
+            const std::string control = ButtonControlName(static_cast<SDL_GamepadButton>(event.gbutton.button));
+            if (!control.empty()) {
+                pressed_buttons_.erase(control);
+                digital_state_changed = true;
+                if (!saw_press_like_change) {
+                    saw_release_only_change = true;
+                }
+            }
             break;
+        }
         case SDL_EVENT_GAMEPAD_AXIS_MOTION: {
             const SDL_GamepadAxis axis = static_cast<SDL_GamepadAxis>(event.gaxis.axis);
             const std::string control = AxisControlName(axis);
@@ -171,22 +276,42 @@ std::optional<ObservedBinding> GamepadBindingCapture::PollBinding(ActionInputKin
             }
 
             const float value = NormalizeAxisValue(event.gaxis.value);
-            if (IsAnalogAxis(axis)) {
-                if (std::fabs(value) >= 0.35f) {
-                    analog_binding_ = ObservedBinding{ActionBinding::Axis(control, "any"), "axis " + control};
-                }
+            const float previous_value = axis_values_.contains(control) ? axis_values_.at(control) : 0.0f;
+            axis_values_[control] = value;
+            digital_state_changed = true;
+            const float threshold = ResolveAxisButtonThreshold(profile, control);
+            const bool was_active = IsAxisButtonActive(control, previous_value, threshold);
+            const bool is_active = IsAxisButtonActive(control, value, threshold);
+            if (is_active && !was_active) {
+                saw_press_like_change = true;
+            }
+            if (!is_active && was_active && !saw_press_like_change) {
+                saw_release_only_change = true;
             }
 
-            if (IsTriggerAxis(axis)) {
-                if (value >= 0.2f) {
-                    const float threshold = std::clamp(value * 0.8f, 0.2f, 1.0f);
-                    trigger_binding_ = ObservedBinding{ActionBinding::Trigger(control, threshold), "trigger " + control};
-                }
+            if (IsAnalogAxis(axis) && std::fabs(value) >= 0.35f) {
+                analog_binding_ = ObservedBinding{ActionBinding::Axis(control, "any"), "axis " + control};
+            }
+
+            if (IsTriggerAxis(axis) && value >= 0.2f) {
+                const float trigger_threshold = std::clamp(value * 0.8f, 0.2f, 1.0f);
+                trigger_binding_ = ObservedBinding{ActionBinding::Trigger(control, trigger_threshold), "trigger " + control};
             }
             break;
         }
         default:
             break;
+        }
+    }
+
+    if (digital_state_changed) {
+        const DigitalObservation observation = BuildDigitalObservedBinding(pressed_buttons_, axis_values_, profile, max_combo_buttons, current_warning_);
+        if (!observation.observed.label.empty()) {
+            if (saw_press_like_change || !saw_release_only_change || !digital_binding_.has_value() || !current_warning_.empty()) {
+                digital_binding_ = observation.observed;
+            }
+        } else if (!current_warning_.empty()) {
+            digital_binding_.reset();
         }
     }
 
@@ -201,10 +326,17 @@ std::optional<ObservedBinding> GamepadBindingCapture::PollBinding(ActionInputKin
     return std::nullopt;
 }
 
+const std::string& GamepadBindingCapture::CurrentWarning() const {
+    return current_warning_;
+}
+
 void GamepadBindingCapture::ClearObservedBindings() {
+    pressed_buttons_.clear();
+    axis_values_.clear();
     digital_binding_.reset();
     analog_binding_.reset();
     trigger_binding_.reset();
+    current_warning_.clear();
 }
 
 }  // namespace trajectory::mapping
