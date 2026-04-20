@@ -451,7 +451,9 @@ MappingScreenResult RunMappingScreen(MappingWorkflowState& workflow,
         }
         if (event.is_character() && event.character() == "c") {
             workflow.ClearCurrentActionBindings();
-            status = "Cleared mapped bindings for this action.";
+            capture.ClearObservedBindings();
+            observed.reset();
+            status = "Cleared mapped bindings and the last observed input for this action.";
             refresh_entries();
             return true;
         }
