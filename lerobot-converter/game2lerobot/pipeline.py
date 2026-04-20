@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 from lerobot.datasets.io_utils import write_info
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
@@ -30,7 +31,7 @@ from .models import (
     GameDefinition,
     GamepadSnapshot,
 )
-from .parsing import read_actions_bin, read_sync_csv, read_video_frames
+from .parsing import open_video_reader, read_actions_bin, read_sync_csv
 
 
 def convert_sessions(
@@ -71,10 +72,10 @@ def convert_sessions(
             continue
 
         try:
-            frames, fps = read_video_frames(session_dir / "capture.mp4")
+            video_reader, fps = open_video_reader(session_dir / "capture.mp4")
             frame_timestamps_ns = read_sync_csv(session_dir / "sync.csv")
             snapshots = read_actions_bin(session_dir / "actions.bin")
-            if len(frames) != len(frame_timestamps_ns):
+            if len(video_reader) != len(frame_timestamps_ns):
                 raise ValueError("frame count does not match sync.csv entries")
 
             expected_fps = _resolve_expected_fps(expected_fps, fps)
@@ -88,25 +89,32 @@ def convert_sessions(
             if not retained_indices:
                 raise ValueError("no frames retained after applying pre-action limit")
 
+            first_frame, next_frame_index = _read_frame_array(
+                video_reader=video_reader,
+                frame_index=retained_indices[0],
+                next_frame_index=None,
+            )
             if dataset is None:
                 dataset = LeRobotDataset.create(
                     repo_id=repo_id,
                     fps=fps,
                     root=output_root,
-                    features=build_features(layout, frames[0].shape),
+                    features=build_features(layout, first_frame.shape),
                     use_videos=True,
                     vcodec="h264",
                 )
 
             _write_session_episode(
                 dataset=dataset,
-                frames=frames,
+                video_reader=video_reader,
                 frame_timestamps_ns=frame_timestamps_ns,
                 retained_indices=retained_indices,
                 snapshots=snapshots,
                 bindings_by_action=action_mapping.bindings_by_action,
                 layout=layout,
                 task=task,
+                first_frame=first_frame,
+                next_frame_index=next_frame_index,
             )
             converted_sessions.append(session_dir.name)
         except Exception as exc:
@@ -149,13 +157,15 @@ def _resolve_expected_fps(expected_fps: int | None, fps: int) -> int:
 def _write_session_episode(
     *,
     dataset: LeRobotDataset,
-    frames,
+    video_reader,
     frame_timestamps_ns: list[int],
     retained_indices: list[int],
     snapshots: list[GamepadSnapshot],
     bindings_by_action,
     layout,
     task: str,
+    first_frame: np.ndarray,
+    next_frame_index: int,
 ) -> None:
     baseline = GamepadSnapshot(
         monotonic_ns=0, axes=(), pressed_buttons=(), pressed_keys=()
@@ -163,7 +173,7 @@ def _write_session_episode(
     snapshot_index = 0
     current_snapshot = baseline
 
-    for frame_index in retained_indices:
+    for retained_position, frame_index in enumerate(retained_indices):
         frame_timestamp = frame_timestamps_ns[frame_index]
         while (
             snapshot_index < len(snapshots)
@@ -171,9 +181,17 @@ def _write_session_episode(
         ):
             current_snapshot = snapshots[snapshot_index]
             snapshot_index += 1
+        if retained_position == 0:
+            frame = first_frame
+        else:
+            frame, next_frame_index = _read_frame_array(
+                video_reader=video_reader,
+                frame_index=frame_index,
+                next_frame_index=next_frame_index,
+            )
         dataset.add_frame(
             {
-                "observation.images.main": frames[frame_index],
+                "observation.images.main": frame,
                 "action": encode_action_vector(
                     layout, bindings_by_action, current_snapshot
                 ),
@@ -182,3 +200,17 @@ def _write_session_episode(
         )
 
     dataset.save_episode()
+
+
+def _read_frame_array(*, video_reader, frame_index: int, next_frame_index: int | None):
+    if next_frame_index == frame_index:
+        frame = video_reader.next()
+    else:
+        frame = video_reader[frame_index]
+    return _frame_to_numpy(frame), frame_index + 1
+
+
+def _frame_to_numpy(frame) -> np.ndarray:
+    if hasattr(frame, "asnumpy"):
+        return frame.asnumpy()
+    return frame

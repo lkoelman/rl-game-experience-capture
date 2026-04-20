@@ -160,7 +160,7 @@ Owns all source-file parsing:
 - `read_actions_bin()`
 - `load_game_definition()`
 - `load_action_mapping_profile()`
-- `read_video_frames()`
+- `open_video_reader()`
 
 Important details:
 
@@ -168,7 +168,7 @@ Important details:
 - `actions.bin` is read as a stream of little-endian length-prefixed protobuf payloads
 - the protobuf schema is constructed dynamically in `_get_gamepad_state_message()`
 - YAML parsing is intentionally permissive and currently extracts only the fields used by the v1 pipeline
-- video frames are decoded eagerly into memory with PyAV
+- video frames are decoded on demand with `decord.VideoReader`
 
 Change this module when:
 
@@ -178,7 +178,7 @@ Change this module when:
 
 Be careful:
 
-- `read_video_frames()` currently loads every frame into memory for the session; this is simple but not streaming-friendly
+- `open_video_reader()` exposes a streaming reader, so callers must consume frames in capture order if they want sequential decoding efficiency
 - the dynamic protobuf descriptor must stay consistent with `trajectory-recorder-cpp/protos/gamepad.proto`
 
 ### `game2lerobot.action_encoding`
@@ -354,7 +354,7 @@ Primary parser entrypoints:
 - `load_action_mapping_profile(path)`
 - `read_sync_csv(path)`
 - `read_actions_bin(path)`
-- `read_video_frames(path)`
+- `open_video_reader(path)`
 
 Primary encoding entrypoints:
 
@@ -502,7 +502,7 @@ Current behavior:
 
 ### Memory Constraint
 
-`read_video_frames()` decodes the full session into memory before writing.
+`open_video_reader()` keeps video decoding streaming-friendly instead of loading the full session before writing.
 
 Implication:
 

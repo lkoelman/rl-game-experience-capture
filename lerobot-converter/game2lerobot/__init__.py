@@ -27,9 +27,9 @@ from .models import (
 from .parsing import (
     load_action_mapping_profile,
     load_game_definition,
+    open_video_reader,
     read_actions_bin,
     read_sync_csv,
-    read_video_frames,
 )
 from .pipeline import convert_sessions
 
@@ -55,8 +55,8 @@ __all__ = [
     "encode_action_vector",
     "load_action_mapping_profile",
     "load_game_definition",
+    "open_video_reader",
     "read_actions_bin",
     "read_sync_csv",
-    "read_video_frames",
     "validate_session_dir",
 ]

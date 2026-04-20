@@ -6,6 +6,7 @@ import pytest
 import yaml
 from google.protobuf import descriptor_pb2, descriptor_pool, message_factory
 
+import game2lerobot.pipeline as pipeline_module
 from game2lerobot import (
     ActionBinding,
     ActionDefinition,
@@ -187,8 +188,8 @@ def test_convert_sessions_writes_dataset_and_metadata(tmp_path: Path):
     _write_video(
         valid / "capture.mp4",
         [
-            np.full((8, 8, 3), 10, dtype=np.uint8),
-            np.full((8, 8, 3), 20, dtype=np.uint8),
+            np.full((32, 32, 3), 10, dtype=np.uint8),
+            np.full((32, 32, 3), 20, dtype=np.uint8),
         ],
         fps=30,
     )
@@ -337,6 +338,188 @@ def test_convert_sessions_strict_mode_fails_on_invalid_session(tmp_path: Path):
             max_pre_action_seconds=0.1,
             strict=True,
         )
+
+
+def test_convert_sessions_streams_frames_from_video_reader(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    batch_root = tmp_path / "sessions"
+    batch_root.mkdir()
+    valid = batch_root / "session_valid"
+    valid.mkdir()
+    (valid / "capture.mp4").write_bytes(b"placeholder")
+    (valid / "sync.csv").write_text(
+        "frame_index,monotonic_ns,pts\n0,1000000000,0\n1,1033333333,33333333\n2,1066666666,66666666\n"
+    )
+    _write_actions_bin(
+        valid / "actions.bin",
+        [
+            GamepadSnapshot(
+                monotonic_ns=1033333333,
+                axes=(0.5, -0.5, 0.0, 0.0, 0.9),
+                pressed_buttons=(1,),
+                pressed_keys=(),
+            ),
+        ],
+    )
+
+    game_definition_path = tmp_path / "game-definition.yaml"
+    game_definition_path.write_text(
+        yaml.safe_dump(
+            {
+                "game_id": "test_game",
+                "display_name": "Test Game",
+                "classes": [
+                    {
+                        "id": "default",
+                        "label": "Default",
+                        "actions": [
+                            {"id": "move", "label": "Move", "kind": "vector2"},
+                            {"id": "attack", "label": "Attack", "kind": "digital"},
+                            {"id": "heavy", "label": "Heavy", "kind": "trigger"},
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+    action_mapping_path = tmp_path / "action-mapping.yaml"
+    action_mapping_path.write_text(
+        yaml.safe_dump(
+            {
+                "game_id": "test_game",
+                "class_ids": ["default"],
+                "profile_name": "test-profile",
+                "complete": False,
+                "actions": {
+                    "move": {
+                        "skipped": False,
+                        "bindings": [{"type": "stick", "control": "left_stick"}],
+                    },
+                    "attack": {
+                        "skipped": False,
+                        "bindings": [{"type": "button", "control": "south"}],
+                    },
+                    "heavy": {
+                        "skipped": False,
+                        "bindings": [
+                            {
+                                "type": "trigger",
+                                "control": "right_trigger",
+                                "threshold": 0.5,
+                            }
+                        ],
+                    },
+                },
+            }
+        )
+    )
+
+    class FakeDecordFrame:
+        def __init__(self, array: np.ndarray):
+            self._array = array
+
+        @property
+        def shape(self) -> tuple[int, ...]:
+            return self._array.shape
+
+        def asnumpy(self) -> np.ndarray:
+            return self._array
+
+    class FakeVideoReader:
+        def __init__(self, frames: list[np.ndarray]):
+            self._frames = frames
+            self._next_index = 0
+
+        def __len__(self) -> int:
+            return len(self._frames)
+
+        def __getitem__(self, index: int) -> FakeDecordFrame:
+            self._next_index = index + 1
+            return FakeDecordFrame(self._frames[index])
+
+        def get_avg_fps(self) -> float:
+            return 30.0
+
+        def next(self) -> FakeDecordFrame:
+            frame = self._frames[self._next_index]
+            self._next_index += 1
+            return FakeDecordFrame(frame)
+
+    class FakeDataset:
+        last_created: "FakeDataset | None" = None
+
+        def __init__(self, *, repo_id, fps, root, features, use_videos, vcodec):
+            self.repo_id = repo_id
+            self.root = root
+            self.frames: list[dict[str, np.ndarray | str]] = []
+            self.episodes_saved = 0
+            self.meta = type("Meta", (), {"info": {"fps": fps, "features": features}})()
+            FakeDataset.last_created = self
+
+        @classmethod
+        def create(cls, *, repo_id, fps, root, features, use_videos, vcodec):
+            return cls(
+                repo_id=repo_id,
+                fps=fps,
+                root=root,
+                features=features,
+                use_videos=use_videos,
+                vcodec=vcodec,
+            )
+
+        def add_frame(self, frame):
+            self.frames.append(frame)
+
+        def save_episode(self):
+            self.episodes_saved += 1
+
+        def finalize(self):
+            self.meta.info["total_episodes"] = self.episodes_saved
+
+    frames = [
+        np.full((32, 32, 3), 10, dtype=np.uint8),
+        np.full((32, 32, 3), 20, dtype=np.uint8),
+        np.full((32, 32, 3), 30, dtype=np.uint8),
+    ]
+
+    def fail_read_video_frames(_path: Path):
+        raise AssertionError(
+            "convert_sessions should not eagerly decode the full video"
+        )
+
+    monkeypatch.setattr(
+        pipeline_module,
+        "read_video_frames",
+        fail_read_video_frames,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        pipeline_module,
+        "open_video_reader",
+        lambda _path: (FakeVideoReader(frames), 30),
+    )
+    monkeypatch.setattr(pipeline_module, "LeRobotDataset", FakeDataset)
+    monkeypatch.setattr(pipeline_module, "write_info", lambda _info, _root: None)
+
+    result = convert_sessions(
+        session_root=batch_root,
+        game_definition=load_game_definition(game_definition_path),
+        action_mapping=load_action_mapping_profile(action_mapping_path),
+        output_root=tmp_path / "out",
+        repo_id="local/test_dataset",
+        task="Defeat enemies",
+        max_pre_action_seconds=0.0,
+        strict=True,
+    )
+
+    assert result.converted_sessions == ("session_valid",)
+    assert FakeDataset.last_created is not None
+    assert FakeDataset.last_created.episodes_saved == 1
+    assert [
+        int(frame["observation.images.main"][0, 0, 0])
+        for frame in FakeDataset.last_created.frames
+    ] == [20, 30]
 
 
 def _write_video(path: Path, frames: list[np.ndarray], fps: int) -> None:

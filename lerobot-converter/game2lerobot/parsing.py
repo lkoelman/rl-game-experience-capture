@@ -10,8 +10,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-import av
-import numpy as np
+from decord import VideoReader, cpu
 import yaml
 from google.protobuf import descriptor_pb2, descriptor_pool, message_factory
 
@@ -108,16 +107,11 @@ def load_action_mapping_profile(path: Path) -> ActionMappingProfile:
     )
 
 
-def read_video_frames(path: Path) -> tuple[list[np.ndarray], int]:
-    """Decode all video frames and the capture FPS from the recorded session video."""
+def open_video_reader(path: Path) -> tuple[VideoReader, int]:
+    """Open a streaming video reader and resolve the recorded session FPS."""
 
-    with av.open(str(path)) as container:
-        stream = container.streams.video[0]
-        fps = int(round(float(stream.average_rate or stream.base_rate)))
-        frames = [
-            frame.to_ndarray(format="rgb24") for frame in container.decode(stream)
-        ]
-    return frames, fps
+    reader = VideoReader(str(path), ctx=cpu(0))
+    return reader, int(round(reader.get_avg_fps()))
 
 
 def _get_gamepad_state_message():
