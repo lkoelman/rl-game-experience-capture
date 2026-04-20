@@ -7,7 +7,7 @@
 </p>
 
 
-Record real gameplay. Turn it into training data. Build agents that learn how you play.
+Record your gaming sessions. Turn it into training data. Build agents that learn how you play.
 
 LeGamer is a monorepo for game-centric agent training workflows: capture synchronized gameplay sessions, map raw controller input to meaningful in-game actions, convert recordings into `LeRobotDataset` format, and prepare for a future where custom agents can assist you, imitate your style, and eventually compete against each other.
 
@@ -20,12 +20,12 @@ The core idea is simple:
 
 ## Why LeGamer
 
-This repo is aimed at a compelling direction for game AI:
+This repo is aimed at training policies to play real AAA games with a minimal, user-friendly setup, without privileged state informaton.
 
 - build your own gameplay dataset from the games you actually play
 - train agents that learn your controls, your timing, and your habits
 - create assistants that can help with combat, movement, farming, or repeated tasks
-- experiment with imitation learning first, then add reward modeling and RL
+- experiment with imitation learning, reward modeling and RL
 - move toward agents that can spar, race, or compete against each other in the same game ecosystem
 
 Today, the repo already supports the first half of that loop well: recording sessions, validating them, defining action vocabularies, and converting data into a format that plugs into the wider LeRobot, PyTorch, and Hugging Face training stack.
