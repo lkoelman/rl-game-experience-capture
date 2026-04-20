@@ -160,13 +160,9 @@ std::optional<ObservedBinding> GamepadBindingCapture::PollBinding(ActionInputKin
             }
             break;
         }
-        case SDL_EVENT_GAMEPAD_BUTTON_UP: {
-            const std::string control = ButtonControlName(static_cast<SDL_GamepadButton>(event.gbutton.button));
-            if (digital_binding_.has_value() && digital_binding_->binding.control == control) {
-                digital_binding_.reset();
-            }
+        case SDL_EVENT_GAMEPAD_BUTTON_UP:
+            // Keep the last observed digital binding until a new one replaces it or the workflow clears it.
             break;
-        }
         case SDL_EVENT_GAMEPAD_AXIS_MOTION: {
             const SDL_GamepadAxis axis = static_cast<SDL_GamepadAxis>(event.gaxis.axis);
             const std::string control = AxisControlName(axis);
@@ -178,8 +174,6 @@ std::optional<ObservedBinding> GamepadBindingCapture::PollBinding(ActionInputKin
             if (IsAnalogAxis(axis)) {
                 if (std::fabs(value) >= 0.35f) {
                     analog_binding_ = ObservedBinding{ActionBinding::Axis(control, "any"), "axis " + control};
-                } else if (analog_binding_.has_value() && analog_binding_->binding.control == control) {
-                    analog_binding_.reset();
                 }
             }
 
@@ -187,8 +181,6 @@ std::optional<ObservedBinding> GamepadBindingCapture::PollBinding(ActionInputKin
                 if (value >= 0.2f) {
                     const float threshold = std::clamp(value * 0.8f, 0.2f, 1.0f);
                     trigger_binding_ = ObservedBinding{ActionBinding::Trigger(control, threshold), "trigger " + control};
-                } else if (trigger_binding_.has_value() && trigger_binding_->binding.control == control) {
-                    trigger_binding_.reset();
                 }
             }
             break;

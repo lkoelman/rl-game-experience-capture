@@ -60,6 +60,10 @@ std::string StatusLabel(MappingActionStatus status) {
     return "unmapped";
 }
 
+ftxui::Element WrappedLine(const std::string& value) {
+    return ftxui::paragraph(value);
+}
+
 bool BindingsEqual(const ActionBinding& left, const ActionBinding& right) {
     return left.type == right.type &&
            left.control == right.control &&
@@ -97,7 +101,7 @@ std::optional<std::size_t> PromptForSelection(const std::string& title,
         return vbox({
                    text(title) | bold,
                    separator(),
-                   text("Use arrow keys and Enter. Press q or Esc to cancel."),
+                   WrappedLine("Use arrow keys and Enter. Press q or Esc to cancel."),
                    separator(),
                    component->Render(),
                }) |
@@ -186,23 +190,23 @@ ReviewChoice RunReviewScreen(const GameDefinition& game,
         using namespace ftxui;
 
         Elements issues;
-        issues.push_back(text("Warnings: " + std::to_string(std::count_if(validation.issues.begin(), validation.issues.end(), [](const ValidationIssue& issue) {
+        issues.push_back(WrappedLine("Warnings: " + std::to_string(std::count_if(validation.issues.begin(), validation.issues.end(), [](const ValidationIssue& issue) {
             return issue.severity == ValidationSeverity::warning;
         })) +
                               "  Errors: " + std::to_string(std::count_if(validation.issues.begin(), validation.issues.end(), [](const ValidationIssue& issue) {
                                   return issue.severity == ValidationSeverity::error;
                               }))));
         for (const auto& issue : validation.issues) {
-            issues.push_back(text(std::string(issue.severity == ValidationSeverity::error ? "Error: " : "Warning: ") + issue.message));
+            issues.push_back(WrappedLine(std::string(issue.severity == ValidationSeverity::error ? "Error: " : "Warning: ") + issue.message));
         }
         if (validation.issues.empty()) {
-            issues.push_back(text("No validation issues."));
+            issues.push_back(WrappedLine("No validation issues."));
         }
 
         return vbox({
                    text("Review action mappings") | bold,
                    separator(),
-                   text("Enter saves, cancels, or reopens an action for editing."),
+                   WrappedLine("Enter saves, cancels, or reopens an action for editing."),
                    separator(),
                    vbox(std::move(issues)),
                    separator(),
@@ -232,11 +236,11 @@ MappingScreenResult RunMappingScreen(MappingWorkflowState& workflow, GamepadBind
         return MappingScreenResult::review;
     }
 
-    std::string status = "Space confirms the observed binding. Right advances or skips. Left goes back. Enter opens review/save.";
+    std::string status = "Space confirms the last observed binding. Right advances or skips. Left goes back. Enter opens review/save.";
     std::optional<ObservedBinding> observed;
     std::vector<std::string> menu_entries;
     int selected = static_cast<int>(workflow.CurrentIndex());
-    int left_width = 60;
+    int right_width = 40;
     bool cancelled = false;
 
     auto refresh_entries = [&] {
@@ -265,16 +269,25 @@ MappingScreenResult RunMappingScreen(MappingWorkflowState& workflow, GamepadBind
     auto left = ftxui::Renderer([&] {
         using namespace ftxui;
 
+        if (workflow.IsFinished()) {
+            return vbox({
+                       text("Mapping complete") | bold,
+                       separator(),
+                       WrappedLine("All actions have been reviewed. Press Enter to open the review screen."),
+                   }) |
+                   border;
+        }
+
         const auto& action = workflow.CurrentAction();
         const auto& state = workflow.ActionStates()[workflow.CurrentIndex()];
 
         Elements bindings;
         if (state.bindings.empty()) {
-            bindings.push_back(text("Current bindings: none"));
+            bindings.push_back(WrappedLine("Current bindings: none"));
         } else {
-            bindings.push_back(text("Current bindings:"));
+            bindings.push_back(WrappedLine("Current bindings:"));
             for (const auto& binding : state.bindings) {
-                bindings.push_back(text("  " + DescribeBinding(binding)));
+                bindings.push_back(WrappedLine("  " + DescribeBinding(binding)));
             }
         }
 
@@ -283,30 +296,33 @@ MappingScreenResult RunMappingScreen(MappingWorkflowState& workflow, GamepadBind
         return vbox({
                    text("Map action " + std::to_string(workflow.CurrentIndex() + 1) + " / " + std::to_string(workflow.TotalActions())) | bold,
                    separator(),
-                   text("Action: " + action.label),
-                   text("Action ID: " + action.id),
-                   text("Input kind: " + InputKindLabel(action.kind)),
-                   text("Required: " + std::string(action.required ? "yes" : "no")),
-                   action.description.empty() ? text("") : text("Description: " + action.description),
+                   WrappedLine("Action: " + action.label),
+                   WrappedLine("Action ID: " + action.id),
+                   WrappedLine("Input kind: " + InputKindLabel(action.kind)),
+                   WrappedLine("Required: " + std::string(action.required ? "yes" : "no")),
+                   action.description.empty() ? text("") : WrappedLine("Description: " + action.description),
                    separator(),
-                   text("Observed input: " + observed_label),
+                   WrappedLine("Last observed input: " + observed_label),
                    separator(),
                    vbox(std::move(bindings)),
                    separator(),
-                   text("Mapped: " + std::to_string(workflow.MappedCount()) +
-                        "  Skipped: " + std::to_string(workflow.SkippedCount()) +
-                        "  Remaining: " + std::to_string(workflow.RemainingCount())),
+                   WrappedLine("Mapped: " + std::to_string(workflow.MappedCount()) +
+                               "  Skipped: " + std::to_string(workflow.SkippedCount()) +
+                               "  Remaining: " + std::to_string(workflow.RemainingCount())),
                    separator(),
-                   text(status),
+                   WrappedLine(status),
                }) |
                border;
     });
 
     auto menu = ftxui::Menu(&menu_entries, &selected);
-    auto layout = ftxui::ResizableSplitRight(left, menu, &left_width);
+    auto layout = ftxui::ResizableSplitLeft(menu, left, &right_width);
 
     auto component = ftxui::CatchEvent(layout, [&](ftxui::Event event) {
         if (event == ftxui::Event::Custom) {
+            if (workflow.IsFinished()) {
+                return true;
+            }
             observed = capture.PollBinding(workflow.CurrentAction().kind);
             refresh_entries();
             return true;
@@ -347,7 +363,7 @@ MappingScreenResult RunMappingScreen(MappingWorkflowState& workflow, GamepadBind
         }
         if (event.is_character() && event.character() == " ") {
             if (!observed.has_value()) {
-                status = "No live input is currently observed.";
+                status = "No gamepad input has been observed yet for this action.";
                 return true;
             }
 
@@ -356,12 +372,12 @@ MappingScreenResult RunMappingScreen(MappingWorkflowState& workflow, GamepadBind
                 return BindingsEqual(binding, observed->binding);
             });
             if (already_present) {
-                status = "Observed binding is already mapped for this action.";
+                status = "The last observed binding is already mapped for this action.";
                 return true;
             }
 
             workflow.AddBindingToCurrentAction(observed->binding);
-            status = "Captured " + observed->label + ". Press Right to continue or Space to add another binding.";
+            status = "Captured " + observed->label + ". Press another gamepad input to replace the remembered candidate, or press Right to continue.";
             capture.ClearObservedBindings();
             observed.reset();
             refresh_entries();

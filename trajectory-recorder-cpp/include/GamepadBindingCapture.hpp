@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <optional>
 #include <string>
 
@@ -34,10 +33,10 @@ public:
     // Releases the opened gamepad and shuts down the SDL subsystems used by the mapper.
     void Stop();
 
-    // Polls SDL events and returns the currently observed binding candidate, if any.
+    // Polls SDL events and returns the most recently observed binding candidate, if any.
     std::optional<ObservedBinding> PollBinding(ActionInputKind kind);
 
-    // Clears any transient observed state so the next action starts fresh.
+    // Clears any remembered observed state so the next action starts fresh.
     void ClearObservedBindings();
 
 private:
