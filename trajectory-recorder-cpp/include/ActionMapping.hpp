@@ -13,6 +13,7 @@ inline constexpr float kDefaultAxisButtonThreshold = 0.5f;
 enum class ActionInputKind {
     digital,
     analog,
+    vector2,
     trigger,
 };
 
@@ -49,6 +50,7 @@ struct GameDefinition {
 enum class BindingType {
     button,
     axis,
+    stick,
     trigger,
     combo,
 };
@@ -93,6 +95,9 @@ struct ActionBinding {
 
     // Creates an analog axis binding using a stable axis name and direction qualifier.
     static ActionBinding Axis(std::string control_name, std::string direction_name);
+
+    // Creates a 2D stick binding using a stable joystick name.
+    static ActionBinding Stick(std::string control_name);
 
     // Creates a trigger binding using a stable trigger name and activation threshold.
     static ActionBinding Trigger(std::string control_name, float activation_threshold);

@@ -53,6 +53,7 @@ private:
     std::unordered_map<std::string, float> axis_values_;
     std::optional<ObservedBinding> digital_binding_;
     std::optional<ObservedBinding> analog_binding_;
+    std::optional<ObservedBinding> vector2_binding_;
     std::optional<ObservedBinding> trigger_binding_;
     std::string current_warning_;
 };

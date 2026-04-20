@@ -42,6 +42,8 @@ std::string InputKindLabel(ActionInputKind kind) {
         return "digital";
     case ActionInputKind::analog:
         return "analog";
+    case ActionInputKind::vector2:
+        return "vector2";
     case ActionInputKind::trigger:
         return "trigger";
     }

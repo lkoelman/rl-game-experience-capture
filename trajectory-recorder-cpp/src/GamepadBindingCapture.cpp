@@ -94,6 +94,27 @@ bool IsTriggerAxis(SDL_GamepadAxis axis) {
     return axis == SDL_GAMEPAD_AXIS_LEFT_TRIGGER || axis == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER;
 }
 
+std::string StickControlName(SDL_GamepadAxis axis) {
+    switch (axis) {
+    case SDL_GAMEPAD_AXIS_LEFTX:
+    case SDL_GAMEPAD_AXIS_LEFTY:
+        return "left_stick";
+    case SDL_GAMEPAD_AXIS_RIGHTX:
+    case SDL_GAMEPAD_AXIS_RIGHTY:
+        return "right_stick";
+    default:
+        return {};
+    }
+}
+
+float StickMagnitude(const std::unordered_map<std::string, float>& axis_values, const std::string& stick_control) {
+    const std::string x_axis = stick_control == "left_stick" ? "leftx" : "rightx";
+    const std::string y_axis = stick_control == "left_stick" ? "lefty" : "righty";
+    const float x = axis_values.contains(x_axis) ? axis_values.at(x_axis) : 0.0f;
+    const float y = axis_values.contains(y_axis) ? axis_values.at(y_axis) : 0.0f;
+    return std::sqrt((x * x) + (y * y));
+}
+
 std::string AxisDirection(float value) {
     return value >= 0.0f ? "positive" : "negative";
 }
@@ -293,6 +314,13 @@ std::optional<ObservedBinding> GamepadBindingCapture::PollBinding(ActionInputKin
                 analog_binding_ = ObservedBinding{ActionBinding::Axis(control, "any"), "axis " + control};
             }
 
+            if (IsAnalogAxis(axis)) {
+                const std::string stick_control = StickControlName(axis);
+                if (!stick_control.empty() && StickMagnitude(axis_values_, stick_control) >= 0.45f) {
+                    vector2_binding_ = ObservedBinding{ActionBinding::Stick(stick_control), "stick " + stick_control};
+                }
+            }
+
             if (IsTriggerAxis(axis) && value >= 0.2f) {
                 const float trigger_threshold = std::clamp(value * 0.8f, 0.2f, 1.0f);
                 trigger_binding_ = ObservedBinding{ActionBinding::Trigger(control, trigger_threshold), "trigger " + control};
@@ -320,6 +348,8 @@ std::optional<ObservedBinding> GamepadBindingCapture::PollBinding(ActionInputKin
         return digital_binding_;
     case ActionInputKind::analog:
         return analog_binding_;
+    case ActionInputKind::vector2:
+        return vector2_binding_;
     case ActionInputKind::trigger:
         return trigger_binding_;
     }
@@ -335,6 +365,7 @@ void GamepadBindingCapture::ClearObservedBindings() {
     axis_values_.clear();
     digital_binding_.reset();
     analog_binding_.reset();
+    vector2_binding_.reset();
     trigger_binding_.reset();
     current_warning_.clear();
 }

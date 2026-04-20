@@ -1,6 +1,14 @@
 game_id: path_of_exile_2
 display_name: Path of Exile 2
 classes:
+  - id: default
+    label: Default
+    actions:
+      # skill gems from https://pathofexile2.wiki.fextralife.com/Warrior
+      - id: move
+        label: Move Character
+        kind: vector2
+        description: "Move character"
   - id: warrior
     label: Warrior
     actions:

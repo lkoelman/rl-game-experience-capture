@@ -25,6 +25,7 @@ trajectory::mapping::GameDefinition BuildGameDefinition() {
     klass.label = "Mage";
     klass.actions.push_back(ActionDefinition{"jump", "Jump", "", ActionInputKind::digital, true});
     klass.actions.push_back(ActionDefinition{"move_x", "Move X", "", ActionInputKind::analog, true});
+    klass.actions.push_back(ActionDefinition{"move_character", "Move Character", "", ActionInputKind::vector2, true});
     klass.actions.push_back(ActionDefinition{"cast_fireball", "Cast Fireball", "", ActionInputKind::digital, true});
 
     game.classes.push_back(klass);
@@ -35,9 +36,9 @@ void TestCollectActionsReturnsClassActions() {
     const auto game = BuildGameDefinition();
     const auto actions = trajectory::mapping::CollectActions(game, "mage");
 
-    Expect(actions.size() == 3, "class actions should be returned in order");
+    Expect(actions.size() == 4, "class actions should be returned in order");
     Expect(actions[0].id == "jump", "class actions should remain available");
-    Expect(actions[2].id == "cast_fireball", "later class actions should remain available");
+    Expect(actions[3].id == "cast_fireball", "later class actions should remain available");
 }
 
 void TestValidationFindsDuplicateBindingsAcrossActions() {
@@ -75,7 +76,7 @@ void TestValidationFindsMissingRequiredActions() {
     const auto validation = trajectory::mapping::ValidateProfile(game, profile);
 
     Expect(!validation.ok, "missing required actions should fail validation");
-    Expect(validation.issues.size() == 2, "two required actions should remain unmapped");
+    Expect(validation.issues.size() == 3, "three required actions should remain unmapped");
 }
 
 void TestWorkflowSupportsSkipConfirmAndEdit() {
@@ -93,7 +94,7 @@ void TestWorkflowSupportsSkipConfirmAndEdit() {
 
     const auto profile_actions = workflow.BuildProfileActions();
 
-    Expect(profile_actions.size() == 3, "workflow should produce one profile action per applicable action");
+    Expect(profile_actions.size() == 4, "workflow should produce one profile action per applicable action");
     Expect(!profile_actions[1].skipped, "editing a skipped action should clear the skipped state");
     Expect(profile_actions[1].bindings[0].control == "leftx", "edited action should retain the replacement binding");
     Expect(profile_actions[2].bindings[0].control == "east", "other mapped actions should remain unchanged");
@@ -129,6 +130,101 @@ void TestWorkflowNavigationSupportsPreviousAndRightArrowSkipBehavior() {
     Expect(workflow.CurrentIndex() == 1, "moving left should revisit the previous action");
     Expect(!workflow.ActionStates()[1].skipped, "moving left should not mutate the previous action");
     Expect(workflow.ActionStates()[1].bindings[0].control == "leftx", "existing bindings should remain intact when navigating");
+}
+
+void TestValidationAcceptsStickBindingForVector2Action() {
+    const auto game = BuildGameDefinition();
+
+    trajectory::mapping::ActionMappingProfile profile;
+    profile.game_id = "demo";
+    profile.class_id = "mage";
+    profile.profile_name = "default";
+    profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Button("south")}});
+    profile.actions.push_back({"move_x", false, {trajectory::mapping::ActionBinding::Axis("leftx", "any")}});
+    profile.actions.push_back({"move_character", false, {trajectory::mapping::ActionBinding::Stick("left_stick")}});
+    profile.actions.push_back({"cast_fireball", false, {trajectory::mapping::ActionBinding::Button("east")}});
+
+    const auto validation = trajectory::mapping::ValidateProfile(game, profile);
+
+    bool found_error = false;
+    for (const auto& issue : validation.issues) {
+        if (issue.severity == trajectory::mapping::ValidationSeverity::error) {
+            found_error = true;
+            break;
+        }
+    }
+    Expect(!found_error, "vector2 actions should accept stick bindings");
+}
+
+void TestValidationRejectsAxisBindingForVector2Action() {
+    const auto game = BuildGameDefinition();
+
+    trajectory::mapping::ActionMappingProfile profile;
+    profile.game_id = "demo";
+    profile.class_id = "mage";
+    profile.profile_name = "default";
+    profile.actions.push_back({"move_character", false, {trajectory::mapping::ActionBinding::Axis("leftx", "any")}});
+
+    const auto validation = trajectory::mapping::ValidateProfile(game, profile);
+
+    bool found_kind_error = false;
+    for (const auto& issue : validation.issues) {
+        if (issue.message.find("vector2") != std::string::npos) {
+            found_kind_error = true;
+            break;
+        }
+    }
+    Expect(found_kind_error, "vector2 actions should reject scalar axis bindings");
+}
+
+void TestValidationRejectsStickBindingForAnalogAction() {
+    const auto game = BuildGameDefinition();
+
+    trajectory::mapping::ActionMappingProfile profile;
+    profile.game_id = "demo";
+    profile.class_id = "mage";
+    profile.profile_name = "default";
+    profile.actions.push_back({"move_x", false, {trajectory::mapping::ActionBinding::Stick("left_stick")}});
+
+    const auto validation = trajectory::mapping::ValidateProfile(game, profile);
+
+    bool found_kind_error = false;
+    for (const auto& issue : validation.issues) {
+        if (issue.message.find("analog") != std::string::npos && issue.message.find("stick") != std::string::npos) {
+            found_kind_error = true;
+            break;
+        }
+    }
+    Expect(found_kind_error, "analog actions should reject stick bindings");
+}
+
+void TestValidationFindsDuplicateStickBindingsAcrossActions() {
+    const auto game = BuildGameDefinition();
+
+    trajectory::mapping::ActionMappingProfile profile;
+    profile.game_id = "demo";
+    profile.class_id = "mage";
+    profile.profile_name = "default";
+    profile.actions.push_back({"move_character", false, {trajectory::mapping::ActionBinding::Stick("left_stick")}});
+    profile.actions.push_back({"cast_fireball", false, {trajectory::mapping::ActionBinding::Stick("left_stick")}});
+
+    const auto validation = trajectory::mapping::ValidateProfile(game, profile);
+
+    bool found_duplicate = false;
+    for (const auto& issue : validation.issues) {
+        if (issue.message.find("left_stick") != std::string::npos) {
+            found_duplicate = true;
+            break;
+        }
+    }
+    Expect(found_duplicate, "duplicate stick bindings should fail validation");
+}
+
+void TestDescribeBindingFormatsStickBinding() {
+    const auto description = trajectory::mapping::DescribeBinding(
+        trajectory::mapping::ActionBinding::Stick("right_stick"));
+
+    Expect(description == "stick:right_stick", "stick bindings should have a stable description");
 }
 
 void TestValidationFindsDuplicateComboBindingsAcrossActions() {
@@ -230,6 +326,11 @@ int main() {
     TestWorkflowSupportsSkipConfirmAndEdit();
     TestWorkflowPreloadsExistingMappingsAndStartsAtFirstUnresolvedAction();
     TestWorkflowNavigationSupportsPreviousAndRightArrowSkipBehavior();
+    TestValidationAcceptsStickBindingForVector2Action();
+    TestValidationRejectsAxisBindingForVector2Action();
+    TestValidationRejectsStickBindingForAnalogAction();
+    TestValidationFindsDuplicateStickBindingsAcrossActions();
+    TestDescribeBindingFormatsStickBinding();
     TestValidationFindsDuplicateComboBindingsAcrossActions();
     TestValidationRejectsOversizedAndDuplicateComboMembers();
     TestValidationAcceptsDirectionalAxisButtonsInCombos();

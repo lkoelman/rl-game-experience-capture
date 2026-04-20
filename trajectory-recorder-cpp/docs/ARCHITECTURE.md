@@ -387,7 +387,7 @@ Responsibilities:
 
 - represent game action definitions grouped by class
 - represent per-user mapping profiles
-- represent binding variants for buttons, analog axes, thresholded triggers, and simultaneous button combos
+- represent binding variants for buttons, scalar analog axes, 2D stick vectors, thresholded triggers, and simultaneous button combos
 - validate game definitions and mapping profiles
 - provide a deterministic workflow state model for tests and the TUI flow
 
@@ -420,6 +420,7 @@ Important current behavior:
 - SDL event polling stays on the mapper thread; the workflow posts periodic FTXUI custom events and polls the latest observed binding without blocking the UI
 - digital actions observe the last remembered simultaneous control set in real time
 - analog actions accept joystick axes and store them as explicit per-axis bindings
+- vector2 actions accept whole-stick motion and store it as an explicit `left_stick` or `right_stick` binding
 - trigger actions store a threshold derived from the observed trigger press
 - digital combo candidates can include physical buttons plus axis-as-button members gated by top-level profile thresholds
 - transient observed bindings are cleared when the operator changes actions or confirms a capture

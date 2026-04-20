@@ -29,6 +29,11 @@ const std::unordered_set<std::string>& ValidAxes() {
     return controls;
 }
 
+const std::unordered_set<std::string>& ValidSticks() {
+    static const std::unordered_set<std::string> controls{"left_stick", "right_stick"};
+    return controls;
+}
+
 // Returns the trigger axis names accepted for threshold-based bindings.
 const std::unordered_set<std::string>& ValidTriggers() {
     static const std::unordered_set<std::string> controls{"left_trigger", "right_trigger"};
@@ -72,6 +77,8 @@ std::string BindingConflictKey(const ActionBinding& binding) {
         return "button:" + binding.control;
     case BindingType::axis:
         return "axis:" + binding.control + ":" + binding.direction;
+    case BindingType::stick:
+        return "stick:" + binding.control;
     case BindingType::trigger:
         return "trigger:" + binding.control;
     case BindingType::combo: {
@@ -131,6 +138,13 @@ ActionBinding ActionBinding::Axis(std::string control_name, std::string directio
     binding.type = BindingType::axis;
     binding.control = std::move(control_name);
     binding.direction = std::move(direction_name);
+    return binding;
+}
+
+ActionBinding ActionBinding::Stick(std::string control_name) {
+    ActionBinding binding;
+    binding.type = BindingType::stick;
+    binding.control = std::move(control_name);
     return binding;
 }
 
@@ -277,10 +291,14 @@ ValidationResult ValidateProfile(const GameDefinition& game, const ActionMapping
         }
 
         for (const auto& binding : action.bindings) {
+            const ActionInputKind expected_kind = it->second.kind;
             switch (binding.type) {
             case BindingType::button:
                 if (!ValidButtons().contains(binding.control)) {
                     AddIssue(result, ValidationSeverity::error, action.action_id, "unknown button control: " + binding.control);
+                }
+                if (expected_kind != ActionInputKind::digital) {
+                    AddIssue(result, ValidationSeverity::error, action.action_id, "action kind " + DescribeBinding(binding) + " is not valid for non-digital action");
                 }
                 break;
             case BindingType::axis:
@@ -290,6 +308,17 @@ ValidationResult ValidateProfile(const GameDefinition& game, const ActionMapping
                 if (!IsValidDirection(binding.direction)) {
                     AddIssue(result, ValidationSeverity::error, action.action_id, "invalid axis direction: " + binding.direction);
                 }
+                if (expected_kind != ActionInputKind::analog) {
+                    AddIssue(result, ValidationSeverity::error, action.action_id, "vector2 actions require stick bindings, not scalar axes");
+                }
+                break;
+            case BindingType::stick:
+                if (!ValidSticks().contains(binding.control)) {
+                    AddIssue(result, ValidationSeverity::error, action.action_id, "unknown stick control: " + binding.control);
+                }
+                if (expected_kind != ActionInputKind::vector2) {
+                    AddIssue(result, ValidationSeverity::error, action.action_id, "analog actions cannot use stick bindings");
+                }
                 break;
             case BindingType::trigger:
                 if (!ValidTriggers().contains(binding.control)) {
@@ -298,8 +327,14 @@ ValidationResult ValidateProfile(const GameDefinition& game, const ActionMapping
                 if (binding.threshold <= 0.0f || binding.threshold > 1.0f) {
                     AddIssue(result, ValidationSeverity::error, action.action_id, "trigger threshold must be within (0, 1]");
                 }
+                if (expected_kind != ActionInputKind::trigger) {
+                    AddIssue(result, ValidationSeverity::error, action.action_id, "trigger bindings are only valid for trigger actions");
+                }
                 break;
             case BindingType::combo: {
+                if (expected_kind != ActionInputKind::digital) {
+                    AddIssue(result, ValidationSeverity::error, action.action_id, "combo bindings are only valid for digital actions");
+                }
                 if (binding.combo_components.empty()) {
                     AddIssue(result, ValidationSeverity::error, action.action_id, "combo binding must contain at least one component");
                     break;
@@ -387,6 +422,9 @@ std::string DescribeBinding(const ActionBinding& binding) {
         break;
     case BindingType::axis:
         description << "axis:" << binding.control << ":" << binding.direction;
+        break;
+    case BindingType::stick:
+        description << "stick:" << binding.control;
         break;
     case BindingType::trigger:
         description << "trigger:" << binding.control << " threshold=" << binding.threshold;

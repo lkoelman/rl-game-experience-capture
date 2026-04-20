@@ -18,10 +18,13 @@ ActionInputKind ParseActionInputKind(const YAML::Node& node, const std::string& 
     if (value == "analog") {
         return ActionInputKind::analog;
     }
+    if (value == "vector2") {
+        return ActionInputKind::vector2;
+    }
     if (value == "trigger") {
         return ActionInputKind::trigger;
     }
-    throw std::runtime_error(path + " must be one of: digital, analog, trigger");
+    throw std::runtime_error(path + " must be one of: digital, analog, vector2, trigger");
 }
 
 // Parses one action definition node from the game catalog.
@@ -87,6 +90,10 @@ ActionBinding ParseBinding(const YAML::Node& node, const std::string& path) {
         const std::string control = node["control"].as<std::string>();
         return ActionBinding::Axis(control, node["direction"] ? node["direction"].as<std::string>() : "any");
     }
+    if (type == "stick") {
+        const std::string control = node["control"].as<std::string>();
+        return ActionBinding::Stick(control);
+    }
     if (type == "trigger") {
         const std::string control = node["control"].as<std::string>();
         if (!node["threshold"]) {
@@ -121,6 +128,8 @@ std::string BindingTypeName(BindingType type) {
         return "button";
     case BindingType::axis:
         return "axis";
+    case BindingType::stick:
+        return "stick";
     case BindingType::trigger:
         return "trigger";
     case BindingType::combo:
@@ -254,7 +263,8 @@ void SaveActionMappingProfile(const ActionMappingProfile& profile, const std::st
         for (const auto& binding : action.bindings) {
             out << YAML::BeginMap;
             out << YAML::Key << "type" << YAML::Value << BindingTypeName(binding.type);
-            if (binding.type == BindingType::button || binding.type == BindingType::axis || binding.type == BindingType::trigger) {
+            if (binding.type == BindingType::button || binding.type == BindingType::axis ||
+                binding.type == BindingType::stick || binding.type == BindingType::trigger) {
                 out << YAML::Key << "control" << YAML::Value << binding.control;
             }
             if (binding.type == BindingType::axis) {

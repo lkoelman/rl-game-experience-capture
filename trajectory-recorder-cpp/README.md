@@ -196,6 +196,7 @@ The mapper currently:
 - accepts `--max-combo-buttons <n>` to raise or lower the allowed number of simultaneous controls in one combo; the default is `2`
 - uses an FTXUI terminal workflow with a two-column layout: the current action on the left and an action `Menu` on the right
 - captures gamepad buttons, joystick axes, and trigger thresholds through SDL3
+- supports first-class 2D stick-vector actions using `kind: vector2` in the game definition and `type: stick` bindings in the saved profile
 - supports digital-action button combinations, including axis-as-button members gated by top-level profile thresholds
 - stores axis-as-button thresholds in `action-mapping.yaml` as a separate top-level section
 - shows the last observed gamepad input or combo in real time

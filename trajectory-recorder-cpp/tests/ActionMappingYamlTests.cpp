@@ -35,6 +35,9 @@ void TestGameDefinitionParsesFromYaml() {
         "        label: Jump\n"
         "        kind: digital\n"
         "        required: true\n"
+        "      - id: move_character\n"
+        "        label: Move Character\n"
+        "        kind: vector2\n"
         "      - id: cast_fireball\n"
         "        label: Cast Fireball\n"
         "        kind: digital\n");
@@ -43,7 +46,8 @@ void TestGameDefinitionParsesFromYaml() {
 
     Expect(game.game_id == "demo", "game id should parse");
     Expect(game.classes.size() == 1, "class list should parse");
-    Expect(game.classes[0].actions.size() == 2, "class actions should parse");
+    Expect(game.classes[0].actions.size() == 3, "class actions should parse");
+    Expect(game.classes[0].actions[1].kind == trajectory::mapping::ActionInputKind::vector2, "vector2 actions should parse");
 }
 
 void TestProfileRoundTripsToYaml() {
@@ -56,6 +60,7 @@ void TestProfileRoundTripsToYaml() {
     profile.axis_button_thresholds = trajectory::mapping::BuildDefaultAxisButtonThresholds();
     profile.actions.push_back({"jump", false, {trajectory::mapping::ActionBinding::Button("south")}});
     profile.actions.push_back({"move_x", false, {trajectory::mapping::ActionBinding::Axis("leftx", "any")}});
+    profile.actions.push_back({"move_character", false, {trajectory::mapping::ActionBinding::Stick("left_stick")}});
     profile.actions.push_back({"cast_fireball", false, {trajectory::mapping::ActionBinding::Trigger("right_trigger", 0.65f)}});
 
     const auto path = WriteTempFile("action-mapping-test.yaml", "");
@@ -63,8 +68,9 @@ void TestProfileRoundTripsToYaml() {
     const auto loaded = trajectory::mapping::LoadActionMappingProfile(path.string());
 
     Expect(loaded.profile_name == "steam-deck", "profile name should round-trip");
-    Expect(loaded.actions.size() == 3, "all actions should round-trip");
-    Expect(loaded.actions[2].bindings[0].threshold == 0.65f, "trigger thresholds should round-trip");
+    Expect(loaded.actions.size() == 4, "all actions should round-trip");
+    Expect(loaded.actions[2].bindings[0].type == trajectory::mapping::BindingType::stick, "stick bindings should round-trip");
+    Expect(loaded.actions[3].bindings[0].threshold == 0.65f, "trigger thresholds should round-trip");
 }
 
 void TestComboProfileRoundTripsWithAxisButtonThresholds() {
@@ -145,6 +151,24 @@ void TestInvalidThresholdFailsClearly() {
     Expect(threw, "invalid trigger threshold should fail with a clear error");
 }
 
+void TestInvalidStickControlFailsClearly() {
+    const auto path = WriteTempFile(
+        "action-mapping-invalid-stick.yaml",
+        "schema_version: 1\n"
+        "game_id: demo\n"
+        "class_id: mage\n"
+        "profile_name: default\n"
+        "complete: true\n"
+        "actions:\n"
+        "  move_character:\n"
+        "    bindings:\n"
+        "      - type: stick\n"
+        "        control: leftx\n");
+
+    const auto loaded = trajectory::mapping::LoadActionMappingProfile(path.string());
+    Expect(loaded.actions[0].bindings[0].type == trajectory::mapping::BindingType::stick, "stick bindings should parse before validation");
+}
+
 }  // namespace
 
 int main() {
@@ -154,5 +178,6 @@ int main() {
     TestComboProfileRoundTripsWithAxisButtonThresholds();
     TestMissingAxisButtonThresholdsDefaultOnLoad();
     TestInvalidThresholdFailsClearly();
+    TestInvalidStickControlFailsClearly();
     return 0;
 }
