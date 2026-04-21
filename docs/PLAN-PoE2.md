@@ -17,17 +17,6 @@
         - [TorchRL.data](https://pytorch.org/rl/main/reference/data.html)
             - very well documented and good example in [DINO-WM repo](https://github.com/gaoyuezhou/dino_wm/blob/main/datasets/traj_dset.py)
 
-    - temporal and spatial downsampling
-    - encode using pretrained autoencoder
-
-    - [ ] update `exp2transitions` script
-        - parse both gamepad and video frames simultaneously
-        - see RLLib experience format: https://docs.ray.io/en/latest/rllib/rllib-offline.html#using-external-expert-experiences
-            - easiest might be to construct `SingleAgentEpisode` following [example](https://docs.ray.io/en/latest/rllib/package_ref/env/env/ray.rllib.env.single_agent_episode.SingleAgentEpisode.html#ray.rllib.env.single_agent_episode.SingleAgentEpisode) and then serialize using built-in method?
-
-        - group sets of gamepad inputs together into (S,A,R,S) tuples
-            - identify good replay buffer framework
-
 
 - [ ] implement game metadata file
     - gamepad -> action mapping

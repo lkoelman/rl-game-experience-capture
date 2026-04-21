@@ -1,4 +1,6 @@
-
+- [X] Record synchronized frames and gamepad inputs
+    - tasks
+        - [ ] review event-driven gamepad recorder: does it record zeroing of gamepad state? Should we switch to querying gamepad state after each frame?
 
 - [X] convert gamepad actions (low-level) to player actions (high level, in-game skills/abilities)
     - just map instantaneous button state to ability state
