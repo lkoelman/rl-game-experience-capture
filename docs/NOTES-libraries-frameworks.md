@@ -21,6 +21,11 @@
         * [\[SDL2\.x\] WinMain vs\. main \- SDL Development \- Simple Directmedia Layer](https://discourse.libsdl.org/t/sdl2-x-winmain-vs-main/51334/4 "[SDL2.x] WinMain vs. main - SDL Development - Simple Directmedia Layer")
         * [Getting started with the SDL2 library for Game Development](https://blog.conan.io/2023/07/20/introduction-to-game-dev-with-sdl2.html "Getting started with the SDL2 library for Game Development")
 
+## Gamepad Emulation
+
+- https://github.com/nefarius/ViGEmBus (archived on 2023-11-02)
+- https://github.com/cgutman/WinUHid (used by Sunshine project, see https://github.com/LizardByte/Sunshine/issues/3527)
+- https://github.com/njz3/vJoy/ (used by Xbox One controller mapper: https://github.com/TheNathannator/RB4InstrumentMapper)
 
 # Video Handling
 

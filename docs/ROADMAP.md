@@ -1,6 +1,5 @@
 - [X] Record synchronized frames and gamepad inputs
     - tasks
-        - [ ] review event-driven gamepad recorder: does it record zeroing of gamepad state? Should we switch to querying gamepad state after each frame?
 
 - [X] convert gamepad actions (low-level) to player actions (high level, in-game skills/abilities)
     - just map instantaneous button state to ability state
@@ -11,9 +10,9 @@
 
 - [ ] LeRobotDataset converter
     - convert our recording sessions to LeRobotDataset format for easy training with PyTorch and HuggingFace libraries
-    - [ ] prepare game recording and example `action-mapping.yaml`
-    - [ ] write PRD with reference to the example recording and action mapping
-    - [ ] (enhancement) add support for 2D vector encodings (tokens, binning, ...)
+    - [X] write PRD with reference to the example recording and action mapping
+    - [ ] record real PoE2 game session
+    - [ ] do conversion and identify painpoints, fixes, enhancements
 
 - [ ] (Optional) Reward modeling for RL
     - can skip this if we start with Imitation Learning / Behavioural Cloning
