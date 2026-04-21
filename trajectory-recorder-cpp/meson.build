@@ -194,6 +194,15 @@ test(
 )
 
 test(
+  'virtual_gamepad_bridge_cli',
+  executable(
+    'virtual_gamepad_bridge_cli_tests',
+    'tests/VirtualGamepadBridgeCliTests.cpp',
+    include_directories : test_inc_dir,
+  ),
+)
+
+test(
   'validate_cli',
   executable(
     'validate_cli_tests',

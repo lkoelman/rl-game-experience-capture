@@ -6,17 +6,28 @@
 #include <ViGEm/Client.h>
 
 #include <atomic>
+#include <chrono>
 #include <csignal>
+#include <cstdint>
 #include <cstring>
 #include <exception>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "VirtualGamepadBridge.hpp"
+#include "VirtualGamepadBridgeCli.hpp"
 
 namespace {
 
+struct EventHandlingResult {
+    bool state_changed{false};
+    bool forwarded_button_changed{false};
+    SDL_GamepadButton button{SDL_GAMEPAD_BUTTON_INVALID};
+};
+
+// Shared shutdown flag set by console/signal handlers and observed by the main loop.
 std::atomic<bool> g_should_stop = false;
 
 BOOL WINAPI ConsoleControlHandler(DWORD control_type) {
@@ -29,6 +40,29 @@ BOOL WINAPI ConsoleControlHandler(DWORD control_type) {
 
 void SignalHandler(int) {
     g_should_stop = true;
+}
+
+std::uint64_t NowMonotonicNs() {
+    return static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch())
+            .count());
+}
+
+std::vector<std::string> CollectArguments(int argc, char* argv[]) {
+    std::vector<std::string> args;
+    args.reserve(argc > 0 ? argc - 1 : 0);
+    for (int index = 1; index < argc; ++index) {
+        args.emplace_back(argv[index] == nullptr ? "" : argv[index]);
+    }
+    return args;
+}
+
+std::string ProgramName(char* argv[]) {
+    if (argv == nullptr || argv[0] == nullptr || argv[0][0] == '\0') {
+        return "virtual_gamepad_bridge";
+    }
+    return argv[0];
 }
 
 std::string VigemErrorToString(VIGEM_ERROR error) {
@@ -88,6 +122,8 @@ void ThrowIfVigemFailed(const char* operation, VIGEM_ERROR error) {
 
 class SdlSession {
 public:
+    // The bridge must continue receiving controller events while a target game
+    // window is focused, so background joystick events are enabled up front.
     SdlSession() {
         if (!SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1")) {
             throw std::runtime_error("failed to enable SDL background gamepad events");
@@ -104,6 +140,8 @@ public:
 
 class VigemSession {
 public:
+    // Owns one client connection and one virtual Xbox 360 target for the
+    // lifetime of the sample process.
     VigemSession() {
         client_ = vigem_alloc();
         if (client_ == nullptr) {
@@ -121,6 +159,8 @@ public:
     }
 
     ~VigemSession() {
+        // Remove the target before freeing handles so Windows sees a clean
+        // unplug event when the sample exits normally.
         if (target_ != nullptr && client_ != nullptr && vigem_target_is_attached(target_)) {
             vigem_target_remove(client_, target_);
         }
@@ -157,6 +197,8 @@ public:
         Close();
     }
 
+    // Opens the first SDL-visible gamepad. The bridge is intentionally single-pad
+    // for now so validation stays focused on the ViGEm integration path.
     bool OpenFirstAvailable() {
         if (gamepad_ != nullptr) {
             return true;
@@ -230,46 +272,58 @@ void PrintStartupBanner() {
         << std::endl;
 }
 
-bool HandleEvent(const SDL_Event& event,
-                 PhysicalGamepad& physical_gamepad,
-                 trajectory::virtual_gamepad::PhysicalGamepadState& state) {
+EventHandlingResult HandleEvent(const SDL_Event& event,
+                                PhysicalGamepad& physical_gamepad,
+                                trajectory::virtual_gamepad::PhysicalGamepadState& state) {
     switch (event.type) {
     case SDL_EVENT_QUIT:
         g_should_stop = true;
-        return false;
+        return {};
     case SDL_EVENT_GAMEPAD_ADDED:
         if (!physical_gamepad.IsOpen() && physical_gamepad.Open(event.gdevice.which)) {
             std::cout << "Opened physical gamepad SDL instance " << event.gdevice.which << ".\n";
         }
-        return false;
+        return {};
     case SDL_EVENT_GAMEPAD_REMOVED:
         if (physical_gamepad.IsOpen() && physical_gamepad.InstanceId() == event.gdevice.which) {
             std::cout << "Physical gamepad removed.\n";
             physical_gamepad.CloseIfMatches(event.gdevice.which);
         }
-        return false;
+        return {};
     case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+    {
+        // Only forward the physical device currently owned by this process.
         if (!physical_gamepad.IsOpen() || event.gaxis.which != physical_gamepad.InstanceId()) {
-            return false;
+            return {};
         }
         trajectory::virtual_gamepad::ApplyAxisMotion(state, static_cast<SDL_GamepadAxis>(event.gaxis.axis), event.gaxis.value);
-        return true;
+        EventHandlingResult result;
+        result.state_changed = true;
+        return result;
+    }
     case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
     case SDL_EVENT_GAMEPAD_BUTTON_UP:
+    {
         if (!physical_gamepad.IsOpen() || event.gbutton.which != physical_gamepad.InstanceId()) {
-            return false;
+            return {};
         }
+        const SDL_GamepadButton button = static_cast<SDL_GamepadButton>(event.gbutton.button);
         trajectory::virtual_gamepad::ApplyButtonChange(
             state,
-            static_cast<SDL_GamepadButton>(event.gbutton.button),
+            button,
             event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN);
-        return true;
+        EventHandlingResult result;
+        result.state_changed = true;
+        result.forwarded_button_changed = true;
+        result.button = button;
+        return result;
+    }
     default:
-        return false;
+        return {};
     }
 }
 
-int Run() {
+int Run(const trajectory::virtual_gamepad_bridge_cli::Options& options) {
     SetConsoleCtrlHandler(ConsoleControlHandler, TRUE);
     std::signal(SIGINT, SignalHandler);
     PrintStartupBanner();
@@ -278,6 +332,7 @@ int Run() {
     VigemSession vigem_session;
     PhysicalGamepad physical_gamepad;
     trajectory::virtual_gamepad::PhysicalGamepadState state;
+    trajectory::virtual_gamepad::ForwardingLogRateLimiter log_rate_limiter(options.max_forward_log_lines_per_second);
 
     if (physical_gamepad.OpenFirstAvailable()) {
         std::cout << "Opened physical gamepad SDL instance " << physical_gamepad.InstanceId() << ".\n";
@@ -291,25 +346,43 @@ int Run() {
     } else {
         std::cout << "Virtual Xbox 360 controller registered.\n";
     }
+    const std::string virtual_gamepad_id = user_index != static_cast<unsigned long>(-1) ? std::to_string(user_index) : "virtual";
+    std::cout << "Forwarded-action logging capped at " << options.max_forward_log_lines_per_second << " lines/sec.\n";
 
     XUSB_REPORT previous_report = trajectory::virtual_gamepad::BuildXusbReport(state);
     vigem_session.Submit(previous_report);
 
+    // The bridge is event-driven: SDL mutates the cached physical state, then
+    // the loop rebuilds a full XUSB report and forwards it only when the final
+    // report bytes actually changed. That keeps ViGEm traffic minimal while
+    // still presenting a complete controller state to the virtual device.
     while (!g_should_stop.load()) {
         SDL_Event event;
         bool saw_event = false;
         while (SDL_PollEvent(&event)) {
             saw_event = true;
-            if (HandleEvent(event, physical_gamepad, state)) {
+            const EventHandlingResult event_result = HandleEvent(event, physical_gamepad, state);
+            if (event_result.state_changed) {
                 const XUSB_REPORT next_report = trajectory::virtual_gamepad::BuildXusbReport(state);
                 if (std::memcmp(&next_report, &previous_report, sizeof(XUSB_REPORT)) != 0) {
                     vigem_session.Submit(next_report);
                     previous_report = next_report;
+
+                    if (event_result.forwarded_button_changed &&
+                        log_rate_limiter.ShouldEmit(NowMonotonicNs())) {
+                        std::cout << trajectory::virtual_gamepad::FormatForwardedButtonLogLine(
+                                         physical_gamepad.InstanceId(),
+                                         event_result.button,
+                                         virtual_gamepad_id)
+                                  << '\n';
+                    }
                 }
             }
         }
 
         if (!saw_event) {
+            // Avoid a busy-spin when idle; new controller state only arrives
+            // through future SDL events.
             SDL_Delay(1);
         }
     }
@@ -320,9 +393,15 @@ int Run() {
 
 }  // namespace
 
-int main() {
+int main(int argc, char* argv[]) {
     try {
-        return Run();
+        trajectory::virtual_gamepad_bridge_cli::Options options;
+        if (!trajectory::virtual_gamepad_bridge_cli::TryParseArguments(
+                CollectArguments(argc, argv), ProgramName(argv), options, std::cout, std::cerr)) {
+            return 1;
+        }
+
+        return Run(options);
     } catch (const std::exception& ex) {
         std::cerr << ex.what() << std::endl;
     } catch (...) {

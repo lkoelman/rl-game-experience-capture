@@ -1,4 +1,5 @@
 #include <stdexcept>
+#include <string>
 
 #include "TestWindowsSetup.hpp"
 #include "VirtualGamepadBridge.hpp"
@@ -76,6 +77,28 @@ void TestDpadAndMetaButtonsMapToExpectedFlags() {
     Expect((report.wButtons & XUSB_GAMEPAD_GUIDE) != 0, "guide should map to guide");
 }
 
+void TestFormatForwardedButtonLogLineUsesPhysicalAndVirtualNames() {
+    const std::string line = trajectory::virtual_gamepad::FormatForwardedButtonLogLine(17, SDL_GAMEPAD_BUTTON_SOUTH, "2");
+
+    Expect(line == "17.south -> 2.A", "forwarded button log should show physical and virtual control names");
+}
+
+void TestRateLimiterEmitsImmediatelyAndThenWaitsForInterval() {
+    trajectory::virtual_gamepad::ForwardingLogRateLimiter limiter(30);
+
+    Expect(limiter.ShouldEmit(0), "first log line should be emitted immediately");
+    Expect(!limiter.ShouldEmit(33'000'000ULL), "rate limiter should suppress lines before the interval elapses");
+    Expect(limiter.ShouldEmit(34'000'000ULL), "rate limiter should emit after the interval elapses");
+}
+
+void TestRateLimiterUsesConfiguredRate() {
+    trajectory::virtual_gamepad::ForwardingLogRateLimiter limiter(5);
+
+    Expect(limiter.ShouldEmit(10), "custom limiter should still emit immediately");
+    Expect(!limiter.ShouldEmit(100'000'000ULL), "custom limiter should enforce its own interval");
+    Expect(limiter.ShouldEmit(210'000'000ULL), "custom limiter should allow slower configured rates");
+}
+
 }  // namespace
 
 int main() {
@@ -84,5 +107,8 @@ int main() {
     TestFaceButtonsMapToXusbButtons();
     TestAxisValuesMapToThumbsticksAndTriggers();
     TestDpadAndMetaButtonsMapToExpectedFlags();
+    TestFormatForwardedButtonLogLineUsesPhysicalAndVirtualNames();
+    TestRateLimiterEmitsImmediatelyAndThenWaitsForInterval();
+    TestRateLimiterUsesConfiguredRate();
     return 0;
 }

@@ -190,9 +190,10 @@ Run it from a Developer PowerShell after building:
 
 ```powershell
 .\builddir\virtual_gamepad_bridge.exe
+.\builddir\virtual_gamepad_bridge.exe --max-forward-log-lines-per-second 60
 ```
 
-The sample prints basic lifecycle status only and exits on `Ctrl+C`.
+The sample prints basic lifecycle status plus rate-limited forwarded button logs in the form `<physical_gamepad_id>.<button> -> <virtual_gamepad_id>.<button>`. The default cap is 30 printed lines per second, and `--max-forward-log-lines-per-second <n>` lets you raise or lower that limit. It exits on `Ctrl+C`.
 
 ### Gamepad Mapping
 
