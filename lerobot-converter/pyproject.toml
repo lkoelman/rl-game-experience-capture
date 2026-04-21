@@ -14,8 +14,48 @@ game2lerobot = "game2lerobot.cli:main"
 
 [dependency-groups]
 dev = [
+    "ruff>=0.15.0",
     "pytest>=9.0.3",
+    "pytest-cov>=4.0.0",
+    "prek>=0.3.3",
 ]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+[build-system]
+requires = ["uv_build>=0.7.19,<0.8.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+
+[tool.ruff.lint]
+ignore = [
+    "E501", # Long line that exceeds maximum allowed length.
+    "F841", # Local variable referenced before assignment, this is annoying during development.
+    "F403", # unable to detect undefined names
+    "E722", # Do not use bare `except`
+    "F405", # may be undefined, or defined from star imports
+]
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402", "F401"]
+"**/{tests,docs,tools}/*" = ["E402"]
+"path/to/file.py" = ["E402"]
