@@ -14,6 +14,7 @@ The intended downstream use is reinforcement-learning dataset construction from 
 
 The project also includes an offline validation path for checking recorded session completeness and inspecting frame-to-input alignment.
 It now also includes a gamepad action mapping path for defining how low-level controller inputs map to high-level in-game actions.
+It also includes a Windows virtual gamepad bridge sample for validating ViGEm integration before the recorder is refactored around virtual input forwarding.
 
 ## Top-Level Structure
 
@@ -33,6 +34,7 @@ Key points:
 
 - Conan manages `protobuf`, `sdl`, `ftxui`, and `yaml-cpp`; OpenCV is currently commented out in `conanfile.txt`.
 - GStreamer is not consumed through Conan. The build uses an existing Windows GStreamer installation root.
+- `thirdparty/ViGEmClient` is built in-tree with Meson as a static library.
 - `scripts/build.ps1` is the canonical build path. It:
   - validates the GStreamer root
   - injects GStreamer paths into the Conan/Meson environment
@@ -67,6 +69,13 @@ The runtime path for recording is:
 - pumps SDL input events on the main thread while waiting for shutdown
 - blocks until Ctrl+C or another console shutdown event
 - calls `Session::Stop()`
+
+The runtime path for the virtual gamepad integration sample is:
+
+1. `src/main_virtual_gamepad_bridge.cpp`
+2. `trajectory::virtual_gamepad::PhysicalGamepadState`
+3. `trajectory::virtual_gamepad::BuildXusbReport()`
+4. `thirdparty/ViGEmClient`
 
 ## Module Responsibilities
 
@@ -231,6 +240,26 @@ Important current limitation:
 - records show the latest known state change, not a continuous timeline
 - short transitions can be missed if SDL does not deliver both edges to the recorder
 - gamepad connect/disconnect does not emit a synthetic neutral snapshot
+
+### Virtual Gamepad Bridge
+
+Files:
+
+- `include/VirtualGamepadBridge.hpp`
+- `src/VirtualGamepadBridge.cpp`
+- `src/main_virtual_gamepad_bridge.cpp`
+
+Responsibilities:
+
+- represent the latest observed SDL gamepad state in a deterministic in-memory model
+- translate SDL button and axis state into `XUSB_REPORT`
+- open one physical SDL gamepad
+- create one virtual Xbox 360 controller through ViGEmClient
+- forward changed reports to the virtual controller
+
+Important limitation:
+
+- the sample does not hide the physical controller itself; external tooling such as HidHide is still required to prevent double input in games
 
 ### `BinaryIO`
 
@@ -464,6 +493,7 @@ Current external library usage is intentionally concentrated:
 - SDL is isolated to `InputLogger`
 - Protobuf is isolated to the generated `gamepad.pb.*` files, `InputLogger`, and replay code
 - OpenCV is isolated to replay/conversion code
+- ViGEmClient is currently isolated to the virtual gamepad bridge sample
 
 This separation is useful when making changes:
 
@@ -529,6 +559,7 @@ Enabled tests:
 - `tests/CaptureSelectionTests.cpp`
 - `tests/ValidateCliTests.cpp`
 - `tests/RecordingValidatorTests.cpp`
+- `tests/VirtualGamepadBridgeTests.cpp`
 
 Covered behavior:
 
@@ -540,6 +571,7 @@ Covered behavior:
 - monitor/window selection resolution and TUI paging helpers
 - validator CLI parsing
 - session validation metrics and integrity failure cases
+- SDL gamepad state to XUSB report translation for the virtual gamepad bridge
 
 Not currently covered by tests:
 
@@ -576,5 +608,6 @@ At the moment, the actively supported built executable is:
 - `record_session`
 - `validate_recording`
 - `map_actions`
+- `virtual_gamepad_bridge`
 
 `convert_dataset` is present in source but not currently enabled in the build.

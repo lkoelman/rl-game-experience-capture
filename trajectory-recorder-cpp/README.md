@@ -38,6 +38,7 @@ Prerequisites on Windows:
 - Meson and Ninja available on `PATH`
 - A working C++20 compiler toolchain
 - GStreamer development/runtime packages installed
+- ViGEmBus installed if you want to run the virtual gamepad bridge sample
 
 The build helper links GStreamer directly from an existing Windows installation root instead of relying on pkg-config-derived linker flags for the GStreamer libraries.
 
@@ -116,6 +117,7 @@ After building, run the executables:
 - `record_session [output_dir] [session_name]`
 - `validate_recording <session_dir|sessions_root>`
 - `map_actions <game-actions.yaml> [action-mapping.yaml] [--profile-name <name>] [--resume-from <existing.yaml>] [--max-combo-buttons <n>]`
+- `virtual_gamepad_bridge`
 - `convert_dataset <capture.mp4> <sync.csv> <actions.bin>`
 
 ### Record Game Sesion
@@ -174,6 +176,23 @@ The validator currently:
 - parses `sync.csv` and `actions.bin`
 - reports timing, dead-period, idle-gap, and input-frequency statistics
 - supports summary, JSON, CSV, and text-based step-through modes
+
+### Virtual Gamepad Bridge
+
+`virtual_gamepad_bridge` is a Windows-only integration sample for ViGEmClient. It opens the first SDL gamepad it can see, creates a virtual Xbox 360 controller through ViGEmBus, and forwards live input changes into that virtual device.
+
+Requirements:
+
+- ViGEmBus must be installed before running the sample
+- if you want a game to see only the virtual controller, hide the physical controller separately with [HidHide](https://github.com/nefarius/HidHide) or equivalent tooling
+
+Run it from a Developer PowerShell after building:
+
+```powershell
+.\builddir\virtual_gamepad_bridge.exe
+```
+
+The sample prints basic lifecycle status only and exits on `Ctrl+C`.
 
 ### Gamepad Mapping
 

@@ -39,6 +39,7 @@ gst_app_dep = declare_dependency(
   ],
 )
 
+subdir('thirdparty/ViGEmClient')
 subdir('protos')
 
 inc_dir = include_directories('include', '.', 'protos')
@@ -108,6 +109,16 @@ executable(
   dependencies : [sdl3_dep, ftxui_dep, yamlcpp_dep],
 )
 
+executable(
+  'virtual_gamepad_bridge',
+  [
+    'src/main_virtual_gamepad_bridge.cpp',
+    'src/VirtualGamepadBridge.cpp',
+  ],
+  include_directories : inc_dir,
+  dependencies : [sdl3_dep, vigemclient_dep],
+)
+
 # Requires OpenCV
 # executable(
 #   'convert_dataset',
@@ -166,6 +177,19 @@ test(
     link_with : core_lib,
     cpp_args : ['-I' + (meson.current_build_dir() / 'librecorder_core.a.p')],
     dependencies : [gst_dep, gst_app_dep, sdl3_dep, protobuf_dep],
+  ),
+)
+
+test(
+  'virtual_gamepad_bridge',
+  executable(
+    'virtual_gamepad_bridge_tests',
+    [
+      'tests/VirtualGamepadBridgeTests.cpp',
+      'src/VirtualGamepadBridge.cpp',
+    ],
+    include_directories : inc_dir,
+    dependencies : [sdl3_dep, vigemclient_dep],
   ),
 )
 
