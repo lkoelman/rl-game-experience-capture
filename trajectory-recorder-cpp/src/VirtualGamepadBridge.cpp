@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <sstream>
 
 namespace trajectory::virtual_gamepad {
@@ -154,6 +155,10 @@ XUSB_REPORT BuildXusbReport(const PhysicalGamepadState& state) {
     SetButtonIfPressed(state, SDL_GAMEPAD_BUTTON_DPAD_RIGHT, XUSB_GAMEPAD_DPAD_RIGHT, report);
 
     return report;
+}
+
+bool ReportsDiffer(const XUSB_REPORT& previous_report, const XUSB_REPORT& next_report) {
+    return std::memcmp(&previous_report, &next_report, sizeof(XUSB_REPORT)) != 0;
 }
 
 std::string FormatForwardedButtonLogLine(SDL_JoystickID physical_gamepad_id,

@@ -32,6 +32,9 @@ void ApplyButtonChange(PhysicalGamepadState& state, SDL_GamepadButton button, bo
 // Converts the cached SDL-style state into the XUSB report expected by ViGEm.
 XUSB_REPORT BuildXusbReport(const PhysicalGamepadState& state);
 
+// Returns true when the virtual device should receive a new report payload.
+bool ReportsDiffer(const XUSB_REPORT& previous_report, const XUSB_REPORT& next_report);
+
 // Formats one forwarded button transition for bridge diagnostics.
 std::string FormatForwardedButtonLogLine(SDL_JoystickID physical_gamepad_id,
                                          SDL_GamepadButton button,

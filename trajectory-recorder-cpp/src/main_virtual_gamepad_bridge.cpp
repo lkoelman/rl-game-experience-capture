@@ -9,7 +9,6 @@
 #include <chrono>
 #include <csignal>
 #include <cstdint>
-#include <cstring>
 #include <exception>
 #include <iostream>
 #include <stdexcept>
@@ -364,7 +363,7 @@ int Run(const trajectory::virtual_gamepad_bridge_cli::Options& options) {
             const EventHandlingResult event_result = HandleEvent(event, physical_gamepad, state);
             if (event_result.state_changed) {
                 const XUSB_REPORT next_report = trajectory::virtual_gamepad::BuildXusbReport(state);
-                if (std::memcmp(&next_report, &previous_report, sizeof(XUSB_REPORT)) != 0) {
+                if (trajectory::virtual_gamepad::ReportsDiffer(previous_report, next_report)) {
                     vigem_session.Submit(next_report);
                     previous_report = next_report;
 

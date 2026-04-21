@@ -110,6 +110,19 @@ void TestRateLimiterUsesConfiguredRate() {
     Expect(limiter.ShouldEmit(210'000'000ULL), "custom limiter should allow slower configured rates");
 }
 
+void TestReportsDifferDetectsChangedReportBytes() {
+    XUSB_REPORT previous_report;
+    XUSB_REPORT_INIT(&previous_report);
+
+    XUSB_REPORT next_report = previous_report;
+    Expect(!trajectory::virtual_gamepad::ReportsDiffer(previous_report, next_report),
+           "identical reports should not be treated as changed");
+
+    next_report.wButtons = XUSB_GAMEPAD_A;
+    Expect(trajectory::virtual_gamepad::ReportsDiffer(previous_report, next_report),
+           "changed reports should be treated as changed");
+}
+
 }  // namespace
 
 int main() {
@@ -122,5 +135,6 @@ int main() {
     TestFormatForwardedButtonLogLineUsesPhysicalAndVirtualNames();
     TestRateLimiterEmitsImmediatelyAndThenWaitsForInterval();
     TestRateLimiterUsesConfiguredRate();
+    TestReportsDifferDetectsChangedReportBytes();
     return 0;
 }

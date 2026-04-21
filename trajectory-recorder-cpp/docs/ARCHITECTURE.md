@@ -14,7 +14,7 @@ The intended downstream use is reinforcement-learning dataset construction from 
 
 The project also includes an offline validation path for checking recorded session completeness and inspecting frame-to-input alignment.
 It now also includes a gamepad action mapping path for defining how low-level controller inputs map to high-level in-game actions.
-It also includes a Windows virtual gamepad bridge sample for validating ViGEm integration before the recorder is refactored around virtual input forwarding.
+It also includes a Windows virtual gamepad bridge sample, and the recorder now uses the same ViGEm-based virtual input forwarding path during capture.
 
 ## Top-Level Structure
 
@@ -204,6 +204,14 @@ Files:
 - `src/InputLogger.cpp`
 
 `InputLogger` runs SDL event polling on the main thread and writes input snapshots to `actions.bin`.
+It also mirrors the tracked physical SDL gamepad into one ViGEm virtual Xbox 360 controller during recording.
+
+Rationale:
+
+- this directly addresses the virtual-gamepad PRD problem statement: the recorder must be able to observe and save controller input without breaking gameplay in the target game
+- the chosen runtime architecture is a proxy path: physical controller -> recorder SDL input path -> ViGEm virtual Xbox controller -> target game
+- in the intended deployment, the game binds to the virtual controller while the recorder logs the physical controller state that produced it
+- physical-device hiding is deliberately external to the recorder, typically via HidHide, so games do not see both the physical and virtual devices at once
 
 Current input model:
 
@@ -211,6 +219,7 @@ Current input model:
 - per-axis floating-point state array
 - pressed gamepad buttons as a set
 - pressed keyboard scancodes as a set
+- one ViGEm-backed virtual Xbox 360 controller
 - serialized snapshots store full state, not individual SDL events
 - `axes[i]` uses the `SDL_GamepadAxis` numeric slot `i`
 - `pressed_buttons` stores `SDL_GamepadButton` enum ids currently held
@@ -219,8 +228,11 @@ Current input model:
 Event handling behavior:
 
 - initializes SDL with `SDL_INIT_EVENTS | SDL_INIT_GAMEPAD`
+- enables `SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS` so forwarding continues after the target game gets focus
+- creates a ViGEm client and one virtual Xbox 360 target during `Start()`
 - opens a gamepad on `SDL_EVENT_GAMEPAD_ADDED`
 - updates internal state on axis/button/key events
+- forwards changed gamepad axis/button state into the virtual controller on those same SDL events
 - serializes one full `GamepadState` snapshot after each processed event
 
 Timestamp behavior:
@@ -240,6 +252,14 @@ Important current limitation:
 - records show the latest known state change, not a continuous timeline
 - short transitions can be missed if SDL does not deliver both edges to the recorder
 - gamepad connect/disconnect does not emit a synthetic neutral snapshot
+- physical-controller hiding is still external to the recorder; users need HidHide or equivalent to avoid double input in games
+
+Architecture implication:
+
+- `InputLogger` is no longer only a file logger; it is now the recorder's input proxy boundary for both persistence and live gamepad forwarding
+- this keeps the PRD-specific workaround localized to the input subsystem instead of spreading ViGEm concerns into `Session`, `VideoRecorder`, or the CLI layer
+- `actions.bin` remains a recording of the observed physical SDL state, not a recording of ViGEm callbacks or virtual-device state
+- startup can now fail because of ViGEm initialization in addition to SDL/file initialization, so recorder bring-up depends on the virtual-controller runtime being available on Windows
 
 ### Virtual Gamepad Bridge
 
@@ -490,15 +510,14 @@ Responsibilities:
 Current external library usage is intentionally concentrated:
 
 - GStreamer is isolated to `VideoRecorder` and `main_record.cpp`
-- SDL is isolated to `InputLogger`
+- SDL and ViGEmClient are isolated to `InputLogger` and the standalone virtual gamepad bridge
 - Protobuf is isolated to the generated `gamepad.pb.*` files, `InputLogger`, and replay code
 - OpenCV is isolated to replay/conversion code
-- ViGEmClient is currently isolated to the virtual gamepad bridge sample
 
 This separation is useful when making changes:
 
 - recording pipeline changes should usually stay in `VideoRecorder`
-- input schema or capture changes usually affect `InputLogger` and `gamepad.proto`
+- input schema, forwarding behavior, or capture changes usually affect `InputLogger` and `gamepad.proto`
 - synchronization format changes affect both `SyncLogger` and `TrajectoryReplayer`
 
 ## Known Build/Architecture Constraints

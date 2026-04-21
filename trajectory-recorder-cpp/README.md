@@ -38,7 +38,7 @@ Prerequisites on Windows:
 - Meson and Ninja available on `PATH`
 - A working C++20 compiler toolchain
 - GStreamer development/runtime packages installed
-- ViGEmBus installed if you want to run the virtual gamepad bridge sample
+- ViGEmBus installed if you want to record with gamepad forwarding enabled or run the virtual gamepad bridge sample
 
 The build helper links GStreamer directly from an existing Windows installation root instead of relying on pkg-config-derived linker flags for the GStreamer libraries.
 
@@ -139,6 +139,7 @@ Examples:
 
 When running `record_session.exe` from PowerShell on Windows, use a Developer PowerShell and make sure the GStreamer runtime `bin` directory is on `PATH`. If Windows cannot load the GStreamer DLLs, the process can exit before `main()` starts and you will see no program output.
 The recorder also pumps SDL input events on the main thread. If that polling is moved to a worker thread, SDL 3 can raise assertion popups on Windows.
+`record_session` now also creates a virtual Xbox 360 controller through ViGEmBus and forwards the tracked physical gamepad into it while it logs `actions.bin`. If a game should see only the forwarded virtual controller, hide the physical device separately with [HidHide](https://github.com/nefarius/HidHide) or equivalent tooling before you start recording.
 
 Example:
 

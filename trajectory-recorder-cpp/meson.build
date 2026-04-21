@@ -44,6 +44,13 @@ subdir('protos')
 
 inc_dir = include_directories('include', '.', 'protos')
 
+virtual_gamepad_lib = static_library(
+  'virtual_gamepad_core',
+  'src/VirtualGamepadBridge.cpp',
+  include_directories : inc_dir,
+  dependencies : [sdl3_dep, vigemclient_dep],
+)
+
 core_lib = static_library(
   'recorder_core',
   [
@@ -56,7 +63,8 @@ core_lib = static_library(
   ],
   generated_protos,
   include_directories : inc_dir,
-  dependencies : [gst_dep, gst_app_dep, sdl3_dep, protobuf_dep],
+  link_with : virtual_gamepad_lib,
+  dependencies : [gst_dep, gst_app_dep, sdl3_dep, protobuf_dep, vigemclient_dep],
 )
 
 mapping_lib = static_library(
@@ -113,9 +121,9 @@ executable(
   'virtual_gamepad_bridge',
   [
     'src/main_virtual_gamepad_bridge.cpp',
-    'src/VirtualGamepadBridge.cpp',
   ],
   include_directories : inc_dir,
+  link_with : virtual_gamepad_lib,
   dependencies : [sdl3_dep, vigemclient_dep],
 )
 
@@ -186,9 +194,9 @@ test(
     'virtual_gamepad_bridge_tests',
     [
       'tests/VirtualGamepadBridgeTests.cpp',
-      'src/VirtualGamepadBridge.cpp',
     ],
     include_directories : inc_dir,
+    link_with : virtual_gamepad_lib,
     dependencies : [sdl3_dep, vigemclient_dep],
   ),
 )
