@@ -2,10 +2,14 @@ syntax = "proto3";
 
 package trajectory;
 
+// Full input snapshot written after each observed input-state change.
 message GamepadState {
+  // Monotonic timestamp shared with video sync for offline alignment.
   uint64 monotonic_ns = 1;
+  // Indexed by SDL_GamepadAxis enum. Each entry is the latest normalized axis value.
   repeated float axes = 2;
+  // SDL_GamepadButton enum values that are currently pressed.
   repeated uint32 pressed_buttons = 3;
+  // SDL_Scancode values that are currently pressed.
   repeated uint32 pressed_keys = 4;
 }
-

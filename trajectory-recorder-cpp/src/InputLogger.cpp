@@ -90,6 +90,9 @@ void InputLogger::PumpEventsOnce() {
 
     SDL_Event event;
     bool saw_event = false;
+    // Drain the SDL queue on the main thread.
+    // SDL gives us transitions such as "axis moved" or "button released".
+    // We translate each transition into updates on our cached full state.
     while (SDL_PollEvent(&event)) {
         saw_event = true;
         bool state_changed = false;
@@ -100,27 +103,35 @@ void InputLogger::PumpEventsOnce() {
             is_running_ = false;
             break;
         case SDL_EVENT_GAMEPAD_ADDED:
+            // Track one controller. The logger records state, not per-device identity.
             if (gamepad_ == nullptr) {
                 gamepad_ = SDL_OpenGamepad(event.gdevice.which);
             }
             break;
         case SDL_EVENT_GAMEPAD_REMOVED:
+            // Device removal stops future updates but does not emit a synthetic "all released" snapshot.
             if (gamepad_ != nullptr && SDL_GetGamepadID(gamepad_) == event.gdevice.which) {
                 SDL_CloseGamepad(gamepad_);
                 gamepad_ = nullptr;
             }
             break;
         case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+            // SDL reports signed 16-bit axis motion.
+            // We normalize to roughly [-1, 1] and store it by SDL_GamepadAxis index.
+            // SnapshotState later copies the whole array so readers can treat `axes[i]`
+            // as "latest known value for axis i" without replaying intermediate events.
             axes_[event.gaxis.axis] = static_cast<float>(event.gaxis.value) / 32767.0f;
             state_changed = true;
             break;
         case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+            // Store pressed buttons as SDL_GamepadButton enum ids.
             state_changed = pressed_buttons_.insert(event.gbutton.button).second;
             break;
         case SDL_EVENT_GAMEPAD_BUTTON_UP:
             state_changed = pressed_buttons_.erase(event.gbutton.button) > 0;
             break;
         case SDL_EVENT_KEY_DOWN:
+            // Keyboard keys are fallback/auxiliary controls stored as SDL_Scancode ids.
             if (!event.key.repeat) {
                 state_changed = pressed_keys_.insert(event.key.scancode).second;
             }
@@ -133,7 +144,13 @@ void InputLogger::PumpEventsOnce() {
         }
         GamepadState snapshot;
         if (state_changed) {
-            // Persist a full snapshot after every input mutation so replay only needs timestamp lookup.
+            // Persist a full snapshot after each mutation.
+            // The protobuf is a state sample: timestamp + all axes + pressed buttons + pressed keys.
+            // Offline alignment can therefore do timestamp lookup only; it does not need to replay SDL events.
+            //
+            // Limitation: this is not fixed-rate sampling.
+            // If the input state stays constant, no new record is written for that time span.
+            // Very short transitions can also be missed if SDL never emits them into this process.
             snapshot = SnapshotState(NowMonotonicNs());
         }
         SDL_UnlockMutex(state_mutex_);
@@ -147,7 +164,8 @@ void InputLogger::PumpEventsOnce() {
     }
 
     if (!saw_event) {
-        // Yield when idle; this loop is event-driven rather than fixed-rate sampled.
+        // Yield when idle.
+        // No event means no new protobuf snapshot, so long idle periods appear as gaps between records.
         SDL_Delay(1);
     }
 }
@@ -179,16 +197,21 @@ GamepadState InputLogger::SnapshotState(std::uint64_t monotonic_ns) const {
     GamepadState state;
     state.set_monotonic_ns(monotonic_ns);
 
+    // Preserve SDL axis ordering exactly.
+    // Readers interpret `axes[n]` using the SDL_GamepadAxis enum value `n`.
     for (float axis : axes_) {
         state.add_axes(axis);
     }
 
+    // Sets are sorted before serialization so equal states encode deterministically.
+    // Each value is an SDL_GamepadButton enum id that is currently held down.
     std::vector<std::uint32_t> buttons(pressed_buttons_.begin(), pressed_buttons_.end());
     std::sort(buttons.begin(), buttons.end());
     for (const auto button : buttons) {
         state.add_pressed_buttons(button);
     }
 
+    // Each value is an SDL_Scancode currently held down.
     std::vector<std::uint32_t> keys(pressed_keys_.begin(), pressed_keys_.end());
     std::sort(keys.begin(), keys.end());
     for (const auto key : keys) {

@@ -202,6 +202,10 @@ Current input model:
 - per-axis floating-point state array
 - pressed gamepad buttons as a set
 - pressed keyboard scancodes as a set
+- serialized snapshots store full state, not individual SDL events
+- `axes[i]` uses the `SDL_GamepadAxis` numeric slot `i`
+- `pressed_buttons` stores `SDL_GamepadButton` enum ids currently held
+- `pressed_keys` stores `SDL_Scancode` enum ids currently held
 
 Event handling behavior:
 
@@ -224,6 +228,9 @@ Important current limitation:
 
 - input logging is event-driven, not fixed-rate sampled
 - if no input events occur, no new `GamepadState` records are written
+- records show the latest known state change, not a continuous timeline
+- short transitions can be missed if SDL does not deliver both edges to the recorder
+- gamepad connect/disconnect does not emit a synthetic neutral snapshot
 
 ### `BinaryIO`
 
