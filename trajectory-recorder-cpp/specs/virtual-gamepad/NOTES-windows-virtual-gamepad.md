@@ -1,6 +1,6 @@
 ## Question: Gamepad Logging
 
-Help me solve the following bug: when recording the gamepad using InputLogger (see attached C++ code) and SDL3, the gamepad events do not reach my video game. It looks like reading the gamepad events consumes them so that   other video games cannot use the gamepad inputs simultaneously. Can I work around this? If yes, how should I change the architecture to ensure that recorded gamepad events reach my video game?
+Help me solve the following bug: when recording the gamepad using InputLogger (see attached C++ code) and SDL3, the gamepad events do not reach my video game. It looks like reading the gamepad events consumes them so that other video games cannot use the gamepad inputs simultaneously. Can I work around this? If yes, how should I change the architecture to ensure that recorded gamepad events reach my video game?
 
 For reference, I've identified several "virtual gamepad" libraries that may be useful:
 - https://github.com/nefarius/ViGEmBus  (archived, would probably need patching)

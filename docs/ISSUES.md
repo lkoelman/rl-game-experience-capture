@@ -16,6 +16,10 @@ It looks like the GamepadState message format is defined again inside the python
 - can we build on Windows runner with MSVC 2022 compiler toolchain?
 - integrate with GitHub releases
 
+## Package dependencies into release
+
+Currently, the installation instructions ask the user to manually install runtime dependencies (GStreamer, ViGEmBus). This is cumbersome: these dependencies should be packaged. Create an installer or simple bundle that packages all runtime dependencies together with the built binaries.
+
 ## Recording UI for Streamers
 
 - low friction recording UI for gamers and streamers

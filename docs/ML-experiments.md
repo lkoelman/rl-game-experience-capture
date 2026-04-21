@@ -8,6 +8,8 @@
 
 - binned movement vectors
 
+- tokenization of 2D movement vectors
+
 - skill type encoding
     - encode the combination of raned/meelee, directed-single-target, directed-AoE, delayed-AoE, delayed-physical-damage, delayed-spell-damage, delayed effect
     - categories to encode
