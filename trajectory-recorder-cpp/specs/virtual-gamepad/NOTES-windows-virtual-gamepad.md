@@ -133,3 +133,116 @@ Looking at your `scripts/build.ps1`, you already handle GStreamer by pointing Me
 2.  **SDK Placement:** Download the ViGEmClient SDK, drop the headers and `.lib` files into a new `third_party/vigemclient` directory in your repo.
 3.  **Build System:** Update `meson.build` with the `declare_dependency` block from Option 1.
 4.  **Integration:** In your `InputLogger` or new `VirtualGamepad` C++ class, simply `#include <ViGEm/Client.h>` and start emitting inputs. You won't need to change `conanfile.txt` or `build.ps1` at all.
+
+
+## Question: Integration using Git Submodule and Meson
+
+Circling back to the question about integration using Windows. The official README for ViGEMClient states "Integrating this library into your project is pretty straight-forward, there are no additional 3rd party dependencies. You can either git submodule or git subtree this repository directly into your source tree or use the provided vcpkg package manager integration found here (recommended, can be updated with ease). The library tries to handle driver compatibility internally so static linking is recommended to avoid DLL hell."
+
+Suggest a strategy for rewriting the CMake build files using Meson, integrating the repo as a submodule into my InputLogger repository, and integrate the library cleanly using Meson.
+
+## Answer (Gemini 3 Pro)
+
+It makes complete sense to follow the official author's advice. Since ViGEmClient is effectively frozen, submoduling the source tree guarantees you have the exact code available locally, and static linking ensures you completely sidestep DLL hell.
+
+Rewriting the build from CMake to Meson is actually a brilliant move here. It keeps your build environment pure, executes faster, and removes the need for your developers to install CMake just to build one dependency. Because `ViGEmClient` is exceptionally small (literally one source file and some headers), this rewrite is trivial.
+
+Here is the strategy to completely replace its CMake build with Meson and cleanly integrate it into your `trajectory-recorder-cpp` repository.
+
+### Step 1: Add the Git Submodule
+Standard practice in Meson is to place external dependencies inside a folder named `subprojects/`.
+
+Run this in the root of your `trajectory-recorder-cpp` repository:
+```powershell
+mkdir subprojects
+git submodule add https://github.com/nefarius/ViGEmClient.git subprojects/ViGEmClient
+```
+
+### Step 2: The Meson Build Rewrite
+Because you cannot directly commit a new file into Nefarius's archived git repository, we have to inject our own `meson.build` file without permanently dirtying the submodule.
+
+The cleanest way to do this in Meson is to define the library compilation directly within your project, using the submodule purely as a source directory.
+
+Create a new file in your project at `subprojects/vigem_meson_wrapper.build` (or directly inside your root `meson.build` if you prefer to keep it centralized).
+
+Here is the complete Meson rewrite of ViGEmClient's CMake logic:
+
+```meson
+# Path to the submodule
+vigem_src_dir = 'ViGEmClient'
+
+# ViGEmClient requires the Windows SetupAPI
+cpp = meson.get_compiler('cpp')
+setupapi_dep = cpp.find_library('setupapi', required : true)
+
+# Define the include directories from the submodule
+vigem_inc_dir = include_directories(vigem_src_dir / 'include')
+
+# ViGEmClient only has a single source file to compile
+vigem_sources = files(vigem_src_dir / 'src' / 'ViGEmClient.cpp')
+
+# Build it as a static library, exactly as the README recommends
+vigem_lib = static_library(
+  'vigemclient',
+  vigem_sources,
+  include_directories : vigem_inc_dir,
+  dependencies : [setupapi_dep],
+  install : false # No need to install it system-wide
+)
+
+# Declare the dependency so the rest of your project can consume it natively
+vigem_dep = declare_dependency(
+  link_with : vigem_lib,
+  include_directories : vigem_inc_dir,
+  dependencies : [setupapi_dep]
+)
+```
+
+### Step 3: Root `meson.build` Integration
+
+Now, you just need to wire this up in your root `meson.build` file.
+
+At the top of your `meson.build`, right after your other dependencies (like `sdl3_dep` and `protobuf_dep`), include the wrapper you just wrote:
+
+```meson
+# ... your existing dependency declarations ...
+yamlcpp_dep = dependency('yaml-cpp')
+
+# 1. Include the wrapper that builds ViGEmClient from the submodule
+subdir('subprojects')
+# (Assuming you put the code from Step 2 into subprojects/meson.build)
+
+# 2. Add vigem_dep to your core_lib or input logger dependency list
+core_lib = static_library(
+  'recorder_core',
+  [
+    'src/Session.cpp',
+    'src/InputLogger.cpp',
+    # ... other files ...
+  ],
+  generated_protos,
+  include_directories : inc_dir,
+  dependencies : [sdl3_dep, protobuf_dep, vigem_dep], # Added vigem_dep here
+)
+```
+
+### Step 4: C++ Integration
+
+With the Meson plumbing finished, your build system now natively compiles the ViGEmClient C++ source into a static object, links it against Windows `setupapi.lib`, and bundles it into your `recorder_core`.
+
+You can immediately start using it in your `InputLogger.cpp` or a new `VirtualGamepad.cpp` class without touching `conanfile.txt` or `build.ps1`:
+
+```cpp
+// Windows specific headers must usually precede ViGEm headers
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <ViGEm/Client.h>
+
+// ...
+PVIGEM_CLIENT client = vigem_alloc();
+if (vigem_connect(client) == VIGEM_ERROR_NONE) {
+    // Successfully connected to the ViGEmBus driver!
+}
+```
+
+This strategy completely eliminates the CMake overhead, perfectly respects Meson's dependency architecture, and fulfills the author's recommendation to statically link the source directly into your tree.

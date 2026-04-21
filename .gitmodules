@@ -1,0 +1,3 @@
+[submodule "trajectory-recorder-cpp/thirdparty/ViGEmClient"]
+	path = trajectory-recorder-cpp/thirdparty/ViGEmClient
+	url = git@github.com:lkoelman/ViGEmClient.git
