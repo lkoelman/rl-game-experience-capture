@@ -179,7 +179,7 @@ The validator currently:
 
 ### Virtual Gamepad Bridge
 
-`virtual_gamepad_bridge` is a Windows-only integration sample for ViGEmClient. It opens the first SDL gamepad it can see, creates a virtual Xbox 360 controller through ViGEmBus, and forwards live input changes into that virtual device.
+`virtual_gamepad_bridge` is a Windows-only integration sample for ViGEmClient. Its goal is to test whether the gamepad forwarding used while recording a game session works correctly. It opens the first SDL gamepad it can see, creates a virtual Xbox 360 controller through ViGEmBus, and forwards live input changes into that virtual device.
 
 Requirements:
 

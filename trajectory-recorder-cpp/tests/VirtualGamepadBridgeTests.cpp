@@ -53,11 +53,22 @@ void TestAxisValuesMapToThumbsticksAndTriggers() {
     const XUSB_REPORT report = trajectory::virtual_gamepad::BuildXusbReport(state);
 
     Expect(report.sThumbLX == 1234, "left stick X should preserve SDL value");
-    Expect(report.sThumbLY == -2345, "left stick Y should preserve SDL value");
+    Expect(report.sThumbLY == 2345, "left stick Y should be inverted to XInput up/down convention");
     Expect(report.sThumbRX == 3456, "right stick X should preserve SDL value");
-    Expect(report.sThumbRY == -4567, "right stick Y should preserve SDL value");
+    Expect(report.sThumbRY == 4567, "right stick Y should be inverted to XInput up/down convention");
     Expect(report.bLeftTrigger == 255, "fully pressed left trigger should saturate to 255");
     Expect(report.bRightTrigger == 128, "half-pressed right trigger should scale to 128");
+}
+
+void TestVerticalStickAxesAreInvertedForXinputConvention() {
+    trajectory::virtual_gamepad::PhysicalGamepadState state;
+    trajectory::virtual_gamepad::ApplyAxisMotion(state, SDL_GAMEPAD_AXIS_LEFTY, -12000);
+    trajectory::virtual_gamepad::ApplyAxisMotion(state, SDL_GAMEPAD_AXIS_RIGHTY, 9000);
+
+    const XUSB_REPORT report = trajectory::virtual_gamepad::BuildXusbReport(state);
+
+    Expect(report.sThumbLY == 12000, "negative SDL left Y should become positive XInput up");
+    Expect(report.sThumbRY == -9000, "positive SDL right Y should become negative XInput down");
 }
 
 void TestDpadAndMetaButtonsMapToExpectedFlags() {
@@ -106,6 +117,7 @@ int main() {
     TestNeutralStateBuildsEmptyReport();
     TestFaceButtonsMapToXusbButtons();
     TestAxisValuesMapToThumbsticksAndTriggers();
+    TestVerticalStickAxesAreInvertedForXinputConvention();
     TestDpadAndMetaButtonsMapToExpectedFlags();
     TestFormatForwardedButtonLogLineUsesPhysicalAndVirtualNames();
     TestRateLimiterEmitsImmediatelyAndThenWaitsForInterval();

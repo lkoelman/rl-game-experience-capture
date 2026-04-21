@@ -8,6 +8,14 @@ namespace trajectory::virtual_gamepad {
 
 namespace {
 
+short InvertVerticalAxis(short value) {
+    if (value == -32768) {
+        return 32767;
+    }
+
+    return static_cast<short>(-value);
+}
+
 // SDL trigger axes are reported as signed 16-bit values, but XUSB expects
 // unsigned trigger bytes. Negative values are treated as unpressed.
 unsigned char ScaleTrigger(short value) {
@@ -118,9 +126,10 @@ XUSB_REPORT BuildXusbReport(const PhysicalGamepadState& state) {
 
     // Sticks map directly slot-for-slot from SDL's canonical gamepad layout.
     report.sThumbLX = state.axes[SDL_GAMEPAD_AXIS_LEFTX];
-    report.sThumbLY = state.axes[SDL_GAMEPAD_AXIS_LEFTY];
+    // SDL Y axes grow downward, while XInput treats positive Y as up.
+    report.sThumbLY = InvertVerticalAxis(state.axes[SDL_GAMEPAD_AXIS_LEFTY]);
     report.sThumbRX = state.axes[SDL_GAMEPAD_AXIS_RIGHTX];
-    report.sThumbRY = state.axes[SDL_GAMEPAD_AXIS_RIGHTY];
+    report.sThumbRY = InvertVerticalAxis(state.axes[SDL_GAMEPAD_AXIS_RIGHTY]);
 
     // Triggers are the only fields that need range conversion.
     report.bLeftTrigger = ScaleTrigger(state.axes[SDL_GAMEPAD_AXIS_LEFT_TRIGGER]);
