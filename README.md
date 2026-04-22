@@ -7,9 +7,9 @@
 </p>
 
 
-Record your gaming sessions. Turn it into training data. Build agents that learn how you play.
+Record your gaming sessions. Turn it into training data. Train policies to play any video game.
 
-LeGamer is a monorepo for game-centric agent training workflows: capture synchronized gameplay sessions, map raw controller input to meaningful in-game actions, convert recordings into `LeRobotDataset` format, and prepare for a future where custom agents can assist you, imitate your style, and eventually compete against each other.
+LeGamer is a monorepo for training action foundation models to play AAA video games: capture synchronized gameplay sessions, map raw controller input to in-game actions, convert recordings into `LeRobotDataset` format, and prepare for a future where custom agents can assist you, imitate your style, and eventually compete against each other.
 
 The core idea is simple:
 

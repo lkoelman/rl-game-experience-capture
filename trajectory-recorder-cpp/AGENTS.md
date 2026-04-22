@@ -3,7 +3,7 @@
 
 ## Test-Driven Development (TDD) Workflow
 
-**Strong preference for TDD**; Claude should guide this workflow proactively.
+**Strong preference for TDD**; You should guide this workflow proactively.
 
 ### TDD Steps
 
@@ -93,10 +93,7 @@ When modifying code, check if these docs need updates:
 - Deprecations: mark as deprecated in docs, add migration guide if needed
 
 **Writing docstrings**
-Only write docstrings for non-trivial components.
-Be concise, specific, and value dense. Write so that a new developer can understand the code and easily tie it back to the system architecture, i.e. to its role in the larger system context.
-Docstrings should expres intent, role in system context, and side effects.
-Class docstrings should also document fields and their intent.
+Only write docstrings for non-trivial components. Be concise, specific, and value dense. Write so that a new developer can understand the code and tie it back to the system architecture, i.e. to its role in the larger system context. Docstrings should expres intent, role in system context, and side effects. Class docstrings should also document fields and their intent.
 
 **Before committing**, ask: "Did I update the docs?"
 
@@ -108,9 +105,25 @@ Clone or download the code to a temporary folder.
 Examples:
 
 ```sh
-# shallow clone (single commit), to look around
+# snapshot of latest commit
 git clone --depth 1 <repo-url> <temp-dir>
 
-# for single files: use githubusercontent.com
+# single files: use githubusercontent.com
 curl -L -o <temp-dir>/README.md https://raw.githubusercontent.com/<user>/<repo>/refs/heads/<branch>/README.md
 ```
+
+# MEMORY
+
+(This section is agent managed)
+
+- [2026-04-22] If you change `meson.build` or test targets, expect Meson to regenerate. Manual `meson test`/`meson compile` runs may fail unless the Conan `protoc.exe` bin dir and GStreamer `bin` dir are on `PATH`; using `scripts/build.ps1` avoids this mismatch.
+
+## Memory Management
+
+- Remember the # MEMORY section of this file before taking actions to avoid repeating past mistakes.
+- After completing a task, if you encounter a non-obvious codebase quirk or a problem that took more than one attempt to fix, immediately update the # MEMORY section with a concise lesson.
+- Always prefix memories with [YYYY-MM-DD]
+- Self-Pruning: If a memory entry is no longer accurate due to code changes, remove or update it.
+- Compaction: Keep the # MEMORY section under 50 lines to manage context efficiency. If memories become redundant or have repetitions that can be generalized, compact the memories by merging similar lessons into a single rule.
+
+**After finishing a task**, ask: "Did I update # MEMORY?"
