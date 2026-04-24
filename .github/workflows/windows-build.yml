@@ -12,13 +12,17 @@ permissions:
 
 env:
   BUILD_DIR: builddir
-  GSTREAMER_VERSION: 1.26.9
+  GSTREAMER_VERSION: 1.28.2
   GSTREAMER_ROOT: C:\gstreamer\1.0\msvc_x86_64
+  GSTREAMER_RELEASE_BASE_URL: https://github.com/lkoelman/rl-game-experience-capture/releases/download/v0.1.0-devel
 
 jobs:
   build:
     name: Build Windows x64 Release
     runs-on: windows-2022
+    defaults:
+      run:
+        working-directory: trajectory-recorder-cpp
 
     steps:
       - name: Checkout
@@ -49,27 +53,35 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
 
-          $baseUrl = "https://gstreamer.freedesktop.org/data/pkg/windows/$env:GSTREAMER_VERSION/msvc"
-          $runtimeInstaller = Join-Path $env:RUNNER_TEMP "gstreamer-runtime.msi"
-          $develInstaller = Join-Path $env:RUNNER_TEMP "gstreamer-devel.msi"
+          $assetName = "gstreamer-1.0-msvc-x86_64-$env:GSTREAMER_VERSION.exe"
+          $installer = Join-Path $env:RUNNER_TEMP $assetName
+          $checksumFile = Join-Path $env:RUNNER_TEMP "$assetName.sha256sum"
 
           Invoke-WebRequest `
-            -Uri "$baseUrl/gstreamer-1.0-msvc-x86_64-$env:GSTREAMER_VERSION.msi" `
-            -OutFile $runtimeInstaller
+            -Uri "$env:GSTREAMER_RELEASE_BASE_URL/$assetName" `
+            -OutFile $installer
           Invoke-WebRequest `
-            -Uri "$baseUrl/gstreamer-1.0-devel-msvc-x86_64-$env:GSTREAMER_VERSION.msi" `
-            -OutFile $develInstaller
+            -Uri "$env:GSTREAMER_RELEASE_BASE_URL/$assetName.sha256sum" `
+            -OutFile $checksumFile
+
+          $checksumLine = (Get-Content -Path $checksumFile -Raw).Trim()
+          if ($checksumLine -notmatch '^([A-Fa-f0-9]{64})\s+\*?(.+)$') {
+            throw "Unexpected GStreamer checksum file format: $checksumLine"
+          }
+          $expectedHash = $Matches[1].ToUpperInvariant()
+          $actualHash = (Get-FileHash -Path $installer -Algorithm SHA256).Hash.ToUpperInvariant()
+          if ($actualHash -ne $expectedHash) {
+            throw "GStreamer installer checksum mismatch. Expected $expectedHash but got $actualHash"
+          }
 
           $installRoot = "C:\gstreamer"
-          foreach ($installer in @($runtimeInstaller, $develInstaller)) {
-            $process = Start-Process `
-              -FilePath msiexec.exe `
-              -ArgumentList @("/i", $installer, "/qn", "/norestart", "INSTALLDIR=$installRoot") `
-              -Wait `
-              -PassThru
-            if ($process.ExitCode -ne 0) {
-              throw "GStreamer installer failed with exit code $($process.ExitCode): $installer"
-            }
+          $process = Start-Process `
+            -FilePath $installer `
+            -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/DIR=$installRoot") `
+            -Wait `
+            -PassThru
+          if ($process.ExitCode -notin @(0, 3010)) {
+            throw "GStreamer installer failed with exit code $($process.ExitCode): $installer"
           }
 
           if (-not (Test-Path $env:GSTREAMER_ROOT)) {
@@ -78,7 +90,7 @@ jobs:
 
       - name: Build and test
         shell: pwsh
-        run: ./trajectory-recorder-cpp/scripts/build.ps1 -BuildDir $env:BUILD_DIR -BuildType release -GStreamerRoot $env:GSTREAMER_ROOT
+        run: ./scripts/build.ps1 -BuildDir $env:BUILD_DIR -BuildType release -GStreamerRoot $env:GSTREAMER_ROOT
 
       - name: Stage app executables
         shell: pwsh
@@ -101,4 +113,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: trajectory-recorder-windows-x64-release
-          path: artifacts/windows-x64-release/
+          path: trajectory-recorder-cpp/artifacts/windows-x64-release/
