@@ -1,0 +1,104 @@
+name: Windows Build
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  BUILD_DIR: builddir
+  GSTREAMER_VERSION: 1.26.9
+  GSTREAMER_ROOT: C:\gstreamer\1.0\msvc_x86_64
+
+jobs:
+  build:
+    name: Build Windows x64 Release
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install conan meson ninja
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Detect Conan profile
+        shell: pwsh
+        run: conan profile detect --force
+
+      - name: Install GStreamer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $baseUrl = "https://gstreamer.freedesktop.org/data/pkg/windows/$env:GSTREAMER_VERSION/msvc"
+          $runtimeInstaller = Join-Path $env:RUNNER_TEMP "gstreamer-runtime.msi"
+          $develInstaller = Join-Path $env:RUNNER_TEMP "gstreamer-devel.msi"
+
+          Invoke-WebRequest `
+            -Uri "$baseUrl/gstreamer-1.0-msvc-x86_64-$env:GSTREAMER_VERSION.msi" `
+            -OutFile $runtimeInstaller
+          Invoke-WebRequest `
+            -Uri "$baseUrl/gstreamer-1.0-devel-msvc-x86_64-$env:GSTREAMER_VERSION.msi" `
+            -OutFile $develInstaller
+
+          $installRoot = "C:\gstreamer"
+          foreach ($installer in @($runtimeInstaller, $develInstaller)) {
+            $process = Start-Process `
+              -FilePath msiexec.exe `
+              -ArgumentList @("/i", $installer, "/qn", "/norestart", "INSTALLDIR=$installRoot") `
+              -Wait `
+              -PassThru
+            if ($process.ExitCode -ne 0) {
+              throw "GStreamer installer failed with exit code $($process.ExitCode): $installer"
+            }
+          }
+
+          if (-not (Test-Path $env:GSTREAMER_ROOT)) {
+            throw "GStreamer root not found after install: $env:GSTREAMER_ROOT"
+          }
+
+      - name: Build and test
+        shell: pwsh
+        run: ./scripts/build.ps1 -BuildDir $env:BUILD_DIR -BuildType release -GStreamerRoot $env:GSTREAMER_ROOT
+
+      - name: Stage app executables
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $artifactDir = "artifacts/windows-x64-release"
+          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+
+          foreach ($exe in @(
+            "record_session.exe",
+            "validate_recording.exe",
+            "map_actions.exe",
+            "virtual_gamepad_bridge.exe"
+          )) {
+            Copy-Item -Path (Join-Path $env:BUILD_DIR $exe) -Destination $artifactDir
+          }
+
+      - name: Upload app executables
+        uses: actions/upload-artifact@v4
+        with:
+          name: trajectory-recorder-windows-x64-release
+          path: artifacts/windows-x64-release/

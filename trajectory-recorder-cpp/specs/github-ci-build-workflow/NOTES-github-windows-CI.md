@@ -75,3 +75,8 @@ jobs:
 * **Targeting Windows 11:** Building for "Windows 11" programmatically just means building with a recent Windows SDK. The `windows-2022` runner includes modern Windows SDKs (like 10.0.22621.0), which fully support Windows 11 APIs.
 * **Backwards Compatibility:** By default, applications compiled with MSVC on these runners will run on both Windows 10 and Windows 11. If you need to restrict your app to Windows 11 exclusively, you will need to specify the minimum supported OS version in your application manifest or explicitly check the OS version at runtime in your code.
 * **Artifacts:** If you want to download the compiled `.exe` file after the workflow finishes, you can add the `actions/upload-artifact@v4` step to upload your build directory.
+
+
+## Additional Notes
+
+The Github-hosted Windows runner images are described in https://github.com/actions/runner-images/tree/main/images/windows . It list the available images (each as a markdown file) along with the tools instaled in each image.

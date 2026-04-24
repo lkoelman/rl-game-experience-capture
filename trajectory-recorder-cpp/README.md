@@ -1,5 +1,7 @@
 # trajectory-recorder-cpp
 
+![Windows Build](https://github.com/lkoelman/rl-game-experience-capture/actions/workflows/windows-build.yml/badge.svg)
+
 C++20 scaffold for recording synchronized gameplay trajectories as video frames plus input state streams for downstream reinforcement-learning dataset conversion.
 
 ## Software stack
@@ -70,7 +72,7 @@ Then run:
 
 The helper rebuilds Conan-managed dependencies to match the active MSVC runtime, build type, and C++20 setting when needed, and it uses the Conan-provided `protoc`.
 
-## Fast Rebuild
+### Fast Rebuild
 
 If `builddir` already exists from a successful `./scripts/build.ps1` run, you can do an incremental rebuild without rerunning Conan or Meson reconfiguration.
 
@@ -88,7 +90,7 @@ meson test -C builddir --print-errorlogs
 
 Use `./scripts/build.ps1` again when dependencies, Conan settings, GStreamer location, or Meson configuration have changed.
 
-## Clean Build Files
+### Clean Build Files
 
 To remove the default build output directory created by the helper script:
 
@@ -109,6 +111,13 @@ conan remove "*" --confirm
 ```
 
 This removes all cached Conan packages and metadata from your local Conan cache, so the next build will resolve and rebuild dependencies from scratch.
+
+### CI Build
+
+GitHub Actions builds Release Windows binaries with MSVC on the `windows-2022` runner. The workflow uses `scripts/build.ps1`, runs the Meson test suite, and uploads the supported app executables as the `trajectory-recorder-windows-x64-release` artifact.
+
+The CI artifact contains only the `.exe` files, not a fully bundled runtime. Running the recorder outside CI still requires GStreamer DLLs on `PATH`, and ViGEmBus is required for virtual gamepad functionality.
+
 
 ## Usage
 
