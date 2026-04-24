@@ -117,6 +117,7 @@ curl -L -o <temp-dir>/README.md https://raw.githubusercontent.com/<user>/<repo>/
 (This section is agent managed)
 
 - [2026-04-22] If you change `meson.build` or test targets, expect Meson to regenerate. Manual `meson test`/`meson compile` runs may fail unless the Conan `protoc.exe` bin dir and GStreamer `bin` dir are on `PATH`; using `scripts/build.ps1` avoids this mismatch.
+- [2026-04-24] The Windows Meson build requires the `trajectory-recorder-cpp/thirdparty/ViGEmClient` submodule; CI checkout must include submodules or Meson fails on `thirdparty/ViGEmClient\meson.build`.
 
 ## Memory Management
 
