@@ -1,7 +1,5 @@
 # trajectory-recorder-cpp
 
-![Windows Build](https://github.com/lkoelman/rl-game-experience-capture/actions/workflows/windows-build.yml/badge.svg)
-
 C++20 scaffold for recording synchronized gameplay trajectories as video frames plus input state streams for downstream reinforcement-learning dataset conversion.
 
 ## Software stack

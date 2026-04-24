@@ -78,7 +78,7 @@ jobs:
 
       - name: Build and test
         shell: pwsh
-        run: ./scripts/build.ps1 -BuildDir $env:BUILD_DIR -BuildType release -GStreamerRoot $env:GSTREAMER_ROOT
+        run: ./trajectory-recorder-cpp/scripts/build.ps1 -BuildDir $env:BUILD_DIR -BuildType release -GStreamerRoot $env:GSTREAMER_ROOT
 
       - name: Stage app executables
         shell: pwsh
