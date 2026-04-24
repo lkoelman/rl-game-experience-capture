@@ -1,15 +1,24 @@
-# LeGamer
-
 <p align="center">
   <img src="docs/assets/huggingface-logo.svg" alt="Hugging Face" height="72" style="vertical-align: middle;" />
   <span style="display: inline-block; margin: 0 16px; font-size: 32px; font-weight: 700; line-height: 72px; vertical-align: middle;">X</span>
   <img src="docs/assets/path-of-exile_PoE2_icon.png" alt="Path of Exile 2" height="72" style="vertical-align: middle;" />
 </p>
 
+<h1 align="center">LeGamer</h1>
 
-Record your gaming sessions. Turn it into training data. Train policies to play any video game.
+<p align="center">
+  Record your gaming sessions. Turn it into training data. Train policies to play any video game.
+</p>
 
-![Windows Build](https://github.com/lkoelman/rl-game-experience-capture/actions/workflows/windows-build.yml/badge.svg)
+
+<p align="center">
+  <img alt="Windows Build" src="https://github.com/lkoelman/rl-game-experience-capture/actions/workflows/windows-build.yml/badge.svg">
+  <img alt="GitHub Repo stars" src="https://img.shields.io/github/stars/lkoelman/rl-game-experience-capture">
+  <img alt="GitHub forks" src="https://img.shields.io/github/forks/lkoelman/rl-game-experience-capture">
+  <img alt="GitHub Issues or Pull Requests" src="https://img.shields.io/github/issues/lkoelman/rl-game-experience-capture">
+  <img alt="GitHub License" src="https://img.shields.io/github/license/lkoelman/rl-game-experience-capture">
+</p>
+
 
 LeGamer is a monorepo for training action foundation models to play AAA video games: capture synchronized gameplay sessions, map raw controller input to in-game actions, convert recordings into `LeRobotDataset` format, and prepare for a future where custom agents can assist you, imitate your style, and eventually compete against each other.
 
