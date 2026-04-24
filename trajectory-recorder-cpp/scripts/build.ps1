@@ -1,18 +1,28 @@
 param(
     [string]$BuildDir = "builddir",
     [string]$BuildType = "debug",
-    [string]$GStreamerRoot = "C:\Program Files\gstreamer\1.0\msvc_x86_64"
+    [string]$GStreamerRoot
 )
 
 $ErrorActionPreference = "Stop"
 
-if (-not (Test-Path $GStreamerRoot)) {
-    throw "GStreamer root not found: $GStreamerRoot"
+$effectiveGStreamerRoot = $env:GSTREAMER_1_0_ROOT_MSVC_X86_64
+if ($PSBoundParameters.ContainsKey('GStreamerRoot')) {
+    $effectiveGStreamerRoot = $GStreamerRoot
+}
+if ([string]::IsNullOrWhiteSpace($effectiveGStreamerRoot)) {
+    $effectiveGStreamerRoot = "C:\Program Files\gstreamer\1.0\msvc_x86_64"
 }
 
-$gstreamerRootShort = (cmd /c "for %I in (""$GStreamerRoot"") do @echo %~sI").Trim()
+Write-Host "Using GStreamer root: $effectiveGStreamerRoot"
+
+if (-not (Test-Path $effectiveGStreamerRoot)) {
+    throw "GStreamer root not found: $effectiveGStreamerRoot"
+}
+
+$gstreamerRootShort = (cmd /c "for %I in (""$effectiveGStreamerRoot"") do @echo %~sI").Trim()
 if ([string]::IsNullOrWhiteSpace($gstreamerRootShort)) {
-    $gstreamerRootShort = $GStreamerRoot
+    $gstreamerRootShort = $effectiveGStreamerRoot
 }
 
 $gstreamerBin = Join-Path $gstreamerRootShort "bin"
@@ -75,7 +85,8 @@ if ($propertiesIndex -ge 0) {
 }
 $mesonNative | Set-Content $mesonNativeFile
 
-$buildScript = "set ""GSTREAMER_1_0_ROOT_X86_64=$gstreamerRootShort"" && " +
+$buildScript = "set ""GSTREAMER_1_0_ROOT_MSVC_X86_64=$gstreamerRootShort"" && " +
+    "set ""GSTREAMER_1_0_ROOT_X86_64=$gstreamerRootShort"" && " +
     "set ""PATH=$protocBin;$gstreamerBin;%PATH%"" && " +
     "set ""PKG_CONFIG_PATH=$pkgConfigPath"" && " +
     "set ""PROTOC=$protocPath"" && " +

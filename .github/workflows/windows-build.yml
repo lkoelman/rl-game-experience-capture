@@ -13,7 +13,6 @@ permissions:
 env:
   BUILD_DIR: builddir
   GSTREAMER_VERSION: 1.28.2
-  GSTREAMER_ROOT: C:\gstreamer\1.0\msvc_x86_64
   GSTREAMER_RELEASE_BASE_URL: https://github.com/lkoelman/rl-game-experience-capture/releases/download/v0.1.0-devel
 
 jobs:
@@ -74,23 +73,30 @@ jobs:
             throw "GStreamer installer checksum mismatch. Expected $expectedHash but got $actualHash"
           }
 
-          $installRoot = "C:\gstreamer"
           $process = Start-Process `
             -FilePath $installer `
-            -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/DIR=$installRoot") `
+            -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-") `
             -Wait `
             -PassThru
           if ($process.ExitCode -notin @(0, 3010)) {
             throw "GStreamer installer failed with exit code $($process.ExitCode): $installer"
           }
 
-          if (-not (Test-Path $env:GSTREAMER_ROOT)) {
-            throw "GStreamer root not found after install: $env:GSTREAMER_ROOT"
+          $gstreamerRoot = [Environment]::GetEnvironmentVariable("GSTREAMER_1_0_ROOT_MSVC_X86_64", "Machine")
+          if ([string]::IsNullOrWhiteSpace($gstreamerRoot)) {
+            $gstreamerRoot = [Environment]::GetEnvironmentVariable("GSTREAMER_1_0_ROOT_MSVC_X86_64", "User")
           }
+          if ([string]::IsNullOrWhiteSpace($gstreamerRoot)) {
+            throw "GStreamer installer did not set GSTREAMER_1_0_ROOT_MSVC_X86_64"
+          }
+          if (-not (Test-Path $gstreamerRoot)) {
+            throw "GStreamer root not found after install: $gstreamerRoot"
+          }
+          "GSTREAMER_1_0_ROOT_MSVC_X86_64=$gstreamerRoot" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Build and test
         shell: pwsh
-        run: ./scripts/build.ps1 -BuildDir $env:BUILD_DIR -BuildType release -GStreamerRoot $env:GSTREAMER_ROOT
+        run: ./scripts/build.ps1 -BuildDir $env:BUILD_DIR -BuildType release
 
       - name: Stage app executables
         shell: pwsh

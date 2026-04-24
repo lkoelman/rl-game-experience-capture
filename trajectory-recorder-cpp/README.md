@@ -41,8 +41,9 @@ Prerequisites on Windows:
 - ViGEmBus installed if you want to record with gamepad forwarding enabled or run the virtual gamepad bridge sample
 
 The build helper links GStreamer directly from an existing Windows installation root instead of relying on pkg-config-derived linker flags for the GStreamer libraries.
+By default, it uses `GSTREAMER_1_0_ROOT_MSVC_X86_64` when that environment variable is set by the GStreamer installer, otherwise it falls back to `C:\Program Files\gstreamer\1.0\msvc_x86_64`.
 
-If GStreamer is installed at `C:\Program Files\gstreamer\1.0\msvc_x86_64`, pass that root explicitly:
+To override the installer-provided environment variable or default root, pass the root explicitly:
 
 ```powershell
 ./scripts/build.ps1 -GStreamerRoot 'C:\Program Files\gstreamer\1.0\msvc_x86_64'
