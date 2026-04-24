@@ -33,12 +33,30 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: trajectory-recorder-cpp/requirements-ci.txt
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: conan-${{ runner.os }}-${{ hashFiles('trajectory-recorder-cpp/conanfile.txt', 'trajectory-recorder-cpp/scripts/build.ps1') }}
+          restore-keys: |
+            conan-${{ runner.os }}-
+
+      - name: Cache GStreamer
+        id: cache-gstreamer
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\Program Files\gstreamer
+          key: gstreamer-${{ runner.os }}-${{ env.GSTREAMER_VERSION }}-msvc-x86_64
 
       - name: Install build tools
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install conan meson ninja
+          python -m pip install -r requirements-ci.txt
 
       - name: Set up MSVC
         uses: ilammy/msvc-dev-cmd@v1
@@ -50,6 +68,7 @@ jobs:
         run: conan profile detect --force
 
       - name: Install GStreamer
+        if: steps.cache-gstreamer.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -84,16 +103,28 @@ jobs:
             throw "GStreamer installer failed with exit code $($process.ExitCode): $installer"
           }
 
-          $gstreamerRoot = [Environment]::GetEnvironmentVariable("GSTREAMER_1_0_ROOT_MSVC_X86_64", "Machine")
+      - name: Set GStreamer environment
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $candidateRoots = @(
+            $env:GSTREAMER_1_0_ROOT_MSVC_X86_64,
+            [Environment]::GetEnvironmentVariable("GSTREAMER_1_0_ROOT_MSVC_X86_64", "Machine"),
+            [Environment]::GetEnvironmentVariable("GSTREAMER_1_0_ROOT_MSVC_X86_64", "User"),
+            "C:\Program Files\gstreamer\1.0\msvc_x86_64"
+          )
+
+          $gstreamerRoot = $candidateRoots |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -Unique |
+            Where-Object { Test-Path $_ } |
+            Select-Object -First 1
+
           if ([string]::IsNullOrWhiteSpace($gstreamerRoot)) {
-            $gstreamerRoot = [Environment]::GetEnvironmentVariable("GSTREAMER_1_0_ROOT_MSVC_X86_64", "User")
+            throw "GStreamer root not found after install or cache restore"
           }
-          if ([string]::IsNullOrWhiteSpace($gstreamerRoot)) {
-            throw "GStreamer installer did not set GSTREAMER_1_0_ROOT_MSVC_X86_64"
-          }
-          if (-not (Test-Path $gstreamerRoot)) {
-            throw "GStreamer root not found after install: $gstreamerRoot"
-          }
+
           "GSTREAMER_1_0_ROOT_MSVC_X86_64=$gstreamerRoot" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Build and test

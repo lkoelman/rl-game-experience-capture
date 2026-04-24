@@ -113,11 +113,7 @@ This removes all cached Conan packages and metadata from your local Conan cache,
 
 ### CI Build
 
-GitHub Actions builds Release Windows binaries with MSVC on the `windows-2022` runner. The workflow uses `scripts/build.ps1`, runs the Meson test suite, and uploads the supported app executables as the `trajectory-recorder-windows-x64-release` artifact.
-
-CI installs GStreamer from the pinned `gstreamer-1.0-msvc-x86_64-1.28.2.exe` asset mirrored in the repository's `v0.1.0-devel` GitHub Release, then verifies the downloaded installer against the matching `.sha256sum` asset before running it. Local developers can still install GStreamer normally from the upstream Windows downloads.
-
-The CI artifact contains only the `.exe` files, not a fully bundled runtime. Running the recorder outside CI still requires GStreamer DLLs on `PATH`, and ViGEmBus is required for virtual gamepad functionality.
+GitHub Actions builds Release Windows binaries with MSVC on the `windows-2022` runner. The CI artifact contains only the `.exe` files, not a fully bundled runtime. Running the recorder outside CI still requires GStreamer DLLs on `PATH`, and ViGEmBus is required for virtual gamepad functionality.
 
 
 ## Usage
