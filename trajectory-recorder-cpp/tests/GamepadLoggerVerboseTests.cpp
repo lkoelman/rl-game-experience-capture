@@ -1,7 +1,7 @@
 #include <stdexcept>
 #include <string>
 
-#include "InputLogger.hpp"
+#include "GamepadLogger.hpp"
 #include "TestWindowsSetup.hpp"
 
 namespace {

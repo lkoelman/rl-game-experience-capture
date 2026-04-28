@@ -422,7 +422,7 @@ const char* ToString(ValidationVerdict verdict) {
 
 std::string FormatValidationSummary(const ValidationReport& report, bool warnings_only) {
     std::ostringstream out;
-    out << "Session: " << report.session_name << '\n';
+    out << "Recording session: " << report.session_name << '\n';
     out << "Verdict: " << ToString(report.verdict) << '\n';
     if (!warnings_only) {
         out << "Frames: " << report.metrics.frame_count << '\n';

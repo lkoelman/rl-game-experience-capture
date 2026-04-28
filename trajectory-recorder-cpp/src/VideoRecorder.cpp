@@ -23,8 +23,10 @@ std::uint64_t NowMonotonicNs() {
 
 }  // namespace
 
-VideoRecorder::VideoRecorder(const std::string& output_path, CaptureTarget capture_target, std::shared_ptr<SyncLogger> sync_logger)
-    : output_path_(output_path), sync_logger_(std::move(sync_logger)), capture_target_(std::move(capture_target)) {}
+VideoRecorder::VideoRecorder(const std::string& output_path,
+                             CaptureTarget capture_target,
+                             std::shared_ptr<FrameTimestampLogger> frame_timestamp_logger)
+    : output_path_(output_path), frame_timestamp_logger_(std::move(frame_timestamp_logger)), capture_target_(std::move(capture_target)) {}
 
 VideoRecorder::~VideoRecorder() {
     Stop();
@@ -146,8 +148,8 @@ GstPadProbeReturn VideoRecorder::PadProbeCallback(GstPad*, GstPadProbeInfo* info
 
     auto* self = static_cast<VideoRecorder*>(user_data);
     auto* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
-    if (buffer != nullptr && self->sync_logger_ != nullptr) {
-        self->sync_logger_->LogFrame(NowMonotonicNs(), GST_BUFFER_PTS(buffer));
+    if (buffer != nullptr && self->frame_timestamp_logger_ != nullptr) {
+        self->frame_timestamp_logger_->LogFrame(NowMonotonicNs(), GST_BUFFER_PTS(buffer));
     }
     return GST_PAD_PROBE_OK;
 }

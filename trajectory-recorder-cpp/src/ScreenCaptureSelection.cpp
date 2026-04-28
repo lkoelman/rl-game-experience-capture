@@ -1,4 +1,4 @@
-#include "CaptureSelection.hpp"
+#include "ScreenCaptureSelection.hpp"
 
 #include <algorithm>
 #include <cctype>

@@ -28,10 +28,10 @@ public:
     bool GetNextStep(cv::Mat& out_frame, GamepadState& out_action);
 
 private:
-    // Loads frame timestamps recorded by SyncLogger.
+    // Loads frame timestamps recorded by FrameTimestampLogger.
     void LoadSyncData(const std::string& path);
 
-    // Loads length-prefixed GamepadState records produced by InputLogger.
+    // Loads length-prefixed GamepadState records produced by GamepadLogger.
     void LoadActions(const std::string& path);
 
     // Returns the last action whose monotonic timestamp is <= the frame timestamp.

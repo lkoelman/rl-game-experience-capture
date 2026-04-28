@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "CaptureSelection.hpp"
+#include "ScreenCaptureSelection.hpp"
 
 namespace trajectory {
 

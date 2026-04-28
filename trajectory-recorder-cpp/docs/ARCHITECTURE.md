@@ -7,8 +7,8 @@ This document is the bootstrapping context for coding agents working on `traject
 The package records a gameplay session as three synchronized artifacts:
 
 - `capture.mp4`: compressed screen recording written by GStreamer
-- `sync.csv`: per-frame timestamp mapping written by `SyncLogger`
-- `actions.bin`: length-prefixed protobuf snapshots of input state written by `InputLogger`
+- `sync.csv`: per-frame timestamp mapping written by `FrameTimestampLogger`
+- `actions.bin`: length-prefixed protobuf snapshots of input state written by `GamepadLogger`
 
 The intended downstream use is reinforcement-learning dataset construction from aligned `(frame, action)` pairs.
 
@@ -47,19 +47,19 @@ Important implication for agents:
 
 - If you change dependency discovery or the build graph, read `scripts/build.ps1` first. It contains non-trivial environment and native-file patching required for a successful Windows build.
 
-## Runtime Architecture: Session Recorder
+## Runtime Architecture: Recorder
 
-The `record_session` executable is built around `src/main_record.cpp`. That file owns process-level setup and shutdown, while the recorder behavior itself is delegated to `Session` and the three recorder components it owns.
+The `record_session` executable is built around `src/main_record.cpp`. That file owns process-level setup and shutdown, while the recorder behavior itself is delegated to `RecordingSession` and the three recorder components it owns.
 
 The high-level runtime path is:
 
 1. `src/main_record.cpp`
-2. `trajectory::CaptureSelector`
-3. `trajectory::CaptureSelection`
-4. `trajectory::Session`
-5. `trajectory::InputLogger`
+2. `trajectory::ScreenCaptureSelector`
+3. `trajectory::ScreenCaptureSelection`
+4. `trajectory::RecordingSession`
+5. `trajectory::GamepadLogger`
 6. `trajectory::VideoRecorder`
-7. `trajectory::SyncLogger`
+7. `trajectory::FrameTimestampLogger`
 
 `main_record.cpp` is intentionally a thin orchestration layer:
 
@@ -68,19 +68,19 @@ The high-level runtime path is:
 - prints the selected output directory, session name, verbosity, and capture target
 - initializes GStreamer with `gst_init`
 - installs POSIX signal handlers and, on Windows, a console control handler
-- creates a `Session` with the resolved `CaptureTarget`
+- creates a `RecordingSession` with the resolved `CaptureTarget`
 - pumps SDL input events on the main thread while waiting for shutdown
 - blocks until Ctrl+C or another console shutdown event
-- calls `Session::Stop()`
+- calls `RecordingSession::Stop()`
 
-`Session` then owns the recorder components and their ordering:
+`RecordingSession` then owns the recorder components and their ordering:
 
 - construction creates the output session directory and wires `sync.csv`, `capture.mp4`, and `actions.bin`
-- `Start()` starts `InputLogger` before `VideoRecorder` so early input events and the virtual controller are available before capture begins
-- `PumpEventsOnce()` delegates to `InputLogger::PumpEventsOnce()` because SDL event polling must remain on the main thread on Windows
-- `Stop()` stops `VideoRecorder` before `InputLogger` so video and sync logging finalize before input capture exits
+- `Start()` starts `GamepadLogger` before `VideoRecorder` so early input events and the virtual controller are available before capture begins
+- `PumpEventsOnce()` delegates to `GamepadLogger::PumpEventsOnce()` because SDL event polling must remain on the main thread on Windows
+- `Stop()` stops `VideoRecorder` before `GamepadLogger` so video and sync logging finalize before input capture exits
 
-`InputLogger` is part of the live input path, not only the persistence path. It generates virtual gamepad actions, forwarded to the game. During `InputLogger::Start()`, the logger creates a ViGEm client, connects to ViGEmBus, allocates one virtual Xbox 360 target, and submits an initial neutral report. During SDL gamepad axis/button events, it updates both:
+`GamepadLogger` is part of the live input path, not only the persistence path. It generates virtual gamepad actions, forwarded to the game. During `GamepadLogger::Start()`, the logger creates a ViGEm client, connects to ViGEmBus, allocates one virtual Xbox 360 target, and submits an initial neutral report. During SDL gamepad axis/button events, it updates both:
 
 - the serialized physical input state written to `actions.bin`
 - the recorder-owned virtual controller that the target game can bind to
@@ -88,11 +88,11 @@ The high-level runtime path is:
 The resulting topology during recording is:
 
 ```text
-physical gamepad -> SDL events in InputLogger -> actions.bin
-physical gamepad -> SDL events in InputLogger -> ViGEmBus virtual Xbox 360 controller -> target game
+physical gamepad -> SDL events in GamepadLogger -> actions.bin
+physical gamepad -> SDL events in GamepadLogger -> ViGEmBus virtual Xbox 360 controller -> target game
 ```
 
-The virtual gamepad bridge is therefore used by `InputLogger` in the recorder just like it is used by the standalone `virtual_gamepad_bridge` sample application. Both paths share the `trajectory::virtual_gamepad` translation helpers:
+The virtual gamepad bridge is therefore used by `GamepadLogger` in the recorder just like it is used by the standalone `virtual_gamepad_bridge` sample application. Both paths share the `trajectory::virtual_gamepad` translation helpers:
 
 - `PhysicalGamepadState`
 - `ApplyAxisMotion()`
@@ -105,7 +105,7 @@ Operational implications:
 - ViGEmBus must be installed for recorder startup when gamepad forwarding is enabled by the current build.
 - `actions.bin` records the observed physical SDL state, not virtual-device callbacks.
 - physical-device hiding is external to the recorder; use HidHide or equivalent when the target game should see only the forwarded virtual controller.
-- failures from ViGEm allocation, bus connection, target creation, or report submission surface as recorder startup/runtime errors through `InputLogger`.
+- failures from ViGEm allocation, bus connection, target creation, or report submission surface as recorder startup/runtime errors through `GamepadLogger`.
 
 The runtime path for the virtual gamepad integration sample is:
 
@@ -116,18 +116,18 @@ The runtime path for the virtual gamepad integration sample is:
 
 ## Module Responsibilities
 
-### `Session`
+### `RecordingSession`
 
 Files:
 
-- `include/Session.hpp`
-- `src/Session.cpp`
+- `include/RecordingSession.hpp`
+- `src/RecordingSession.cpp`
 
-`Session` is the orchestrator. It owns:
+`RecordingSession` is the orchestrator. It owns:
 
-- one `SyncLogger`
+- one `FrameTimestampLogger`
 - one `VideoRecorder`
-- one `InputLogger`
+- one `GamepadLogger`
 
 It also creates the per-session output directory:
 
@@ -137,9 +137,9 @@ It also creates the per-session output directory:
 
 Current lifecycle:
 
-- `Start()` starts `InputLogger` first, then `VideoRecorder`
-- `PumpEventsOnce()` forwards the main-thread SDL event pump to `InputLogger`
-- `Stop()` stops `VideoRecorder` first, then `InputLogger`
+- `Start()` starts `GamepadLogger` first, then `VideoRecorder`
+- `PumpEventsOnce()` forwards the main-thread SDL event pump to `GamepadLogger`
+- `Stop()` stops `VideoRecorder` first, then `GamepadLogger`
 
 Construction now also receives a resolved `CaptureTarget`, which it forwards to `VideoRecorder`.
 
@@ -164,12 +164,12 @@ Current implementation details:
 - encodes with `x264enc`
 - writes `mp4`
 
-### `CaptureSelection`
+### `ScreenCaptureSelection`
 
 Files:
 
-- `include/CaptureSelection.hpp`
-- `src/CaptureSelection.cpp`
+- `include/ScreenCaptureSelection.hpp`
+- `src/ScreenCaptureSelection.cpp`
 
 This is the deterministic selection helper layer shared by the CLI and the interactive selector.
 
@@ -181,12 +181,12 @@ Responsibilities:
 - format monitor/window labels for display
 - build 1-9 shortcut pages for the TUI
 
-### `CaptureSelector`
+### `ScreenCaptureSelector`
 
 Files:
 
-- `include/CaptureSelector.hpp`
-- `src/CaptureSelector.cpp`
+- `include/ScreenCaptureSelector.hpp`
+- `src/ScreenCaptureSelector.cpp`
 
 This is the Windows-only startup UI/integration layer.
 
@@ -201,7 +201,7 @@ Synchronization behavior:
 
 - a pad probe is attached to `probe_point`'s `src` pad
 - on each `GstBuffer`, the probe captures a `steady_clock` nanosecond timestamp immediately
-- the probe forwards `(monotonic_ns, GST_BUFFER_PTS(buffer))` to `SyncLogger`
+- the probe forwards `(monotonic_ns, GST_BUFFER_PTS(buffer))` to `FrameTimestampLogger`
 
 Threading behavior:
 
@@ -214,14 +214,14 @@ Resource-management notes:
 - GStreamer objects are managed manually with `gst_object_unref`
 - `Stop()` sends EOS, waits for EOS or ERROR on the bus so `mp4mux` can finalize the file, then sets the pipeline state to `NULL`, stops the main loop, joins the thread, and releases GStreamer resources
 
-### `SyncLogger`
+### `FrameTimestampLogger`
 
 Files:
 
-- `include/SyncLogger.hpp`
-- `src/SyncLogger.cpp`
+- `include/FrameTimestampLogger.hpp`
+- `src/FrameTimestampLogger.cpp`
 
-`SyncLogger` is a minimal thread-safe CSV append-only logger.
+`FrameTimestampLogger` is a minimal thread-safe CSV append-only logger.
 
 Current file format:
 
@@ -233,14 +233,14 @@ Implementation details:
 - protected by `std::mutex`
 - frame numbering is local and monotonic via `frame_count_`
 
-### `InputLogger`
+### `GamepadLogger`
 
 Files:
 
-- `include/InputLogger.hpp`
-- `src/InputLogger.cpp`
+- `include/GamepadLogger.hpp`
+- `src/GamepadLogger.cpp`
 
-`InputLogger` runs SDL event polling on the main thread and writes input snapshots to `actions.bin`.
+`GamepadLogger` runs SDL event polling on the main thread and writes input snapshots to `actions.bin`.
 It also mirrors the tracked physical SDL gamepad into one ViGEm virtual Xbox 360 controller during recording.
 
 Rationale:
@@ -293,8 +293,8 @@ Important current limitation:
 
 Architecture implication:
 
-- `InputLogger` is no longer only a file logger; it is now the recorder's input proxy boundary for both persistence and live gamepad forwarding
-- this keeps the PRD-specific workaround localized to the input subsystem instead of spreading ViGEm concerns into `Session`, `VideoRecorder`, or the CLI layer
+- `GamepadLogger` is no longer only a file logger; it is now the recorder's input proxy boundary for both persistence and live gamepad forwarding
+- this keeps the PRD-specific workaround localized to the input subsystem instead of spreading ViGEm concerns into `RecordingSession`, `VideoRecorder`, or the CLI layer
 - `actions.bin` remains a recording of the observed physical SDL state, not a recording of ViGEm callbacks or virtual-device state
 - startup can now fail because of ViGEm initialization in addition to SDL/file initialization, so recorder bring-up depends on the virtual-controller runtime being available on Windows
 
@@ -333,7 +333,7 @@ Responsibilities:
 
 It is used by:
 
-- `InputLogger::WriteState()`
+- `GamepadLogger::WriteState()`
 - `TrajectoryReplayer::LoadActions()`
 - tests in `tests/BinaryIOTests.cpp`
 
@@ -423,7 +423,7 @@ Columns:
 
 Produced by:
 
-- `SyncLogger`
+- `FrameTimestampLogger`
 
 Consumed by:
 
@@ -439,7 +439,7 @@ Format:
 
 Produced by:
 
-- `InputLogger::WriteState()`
+- `GamepadLogger::WriteState()`
 
 Consumed by:
 
@@ -547,15 +547,15 @@ Responsibilities:
 Current external library usage is intentionally concentrated:
 
 - GStreamer is isolated to `VideoRecorder` and `main_record.cpp`
-- SDL and ViGEmClient are isolated to `InputLogger` and the standalone virtual gamepad bridge
-- Protobuf is isolated to the generated `gamepad.pb.*` files, `InputLogger`, and replay code
+- SDL and ViGEmClient are isolated to `GamepadLogger` and the standalone virtual gamepad bridge
+- Protobuf is isolated to the generated `gamepad.pb.*` files, `GamepadLogger`, and replay code
 - OpenCV is isolated to replay/conversion code
 
 This separation is useful when making changes:
 
 - recording pipeline changes should usually stay in `VideoRecorder`
-- input schema, forwarding behavior, or capture changes usually affect `InputLogger` and `gamepad.proto`
-- synchronization format changes affect both `SyncLogger` and `TrajectoryReplayer`
+- input schema, forwarding behavior, or capture changes usually affect `GamepadLogger` and `gamepad.proto`
+- synchronization format changes affect both `FrameTimestampLogger` and `TrajectoryReplayer`
 
 ## Known Build/Architecture Constraints
 
@@ -597,7 +597,7 @@ Current solution:
 
 ### Generated protobuf headers are not treated as a public include surface
 
-The protobuf-generated header is available for sources that need it, but the public `Session.hpp` avoids including `InputLogger.hpp`.
+The protobuf-generated header is available for sources that need it, but the public `RecordingSession.hpp` avoids including `GamepadLogger.hpp`.
 
 Reason:
 
@@ -612,7 +612,7 @@ Enabled tests:
 - `tests/BinaryIOTests.cpp`
 - `tests/RecordCliTests.cpp`
 - `tests/VideoRecorderPathTests.cpp`
-- `tests/CaptureSelectionTests.cpp`
+- `tests/ScreenCaptureSelectionTests.cpp`
 - `tests/ValidateCliTests.cpp`
 - `tests/RecordingValidatorTests.cpp`
 - `tests/VirtualGamepadBridgeTests.cpp`
@@ -631,9 +631,9 @@ Covered behavior:
 
 Not currently covered by tests:
 
-- `Session`
+- `RecordingSession`
 - `VideoRecorder`
-- `InputLogger`
+- `GamepadLogger`
 - replay path
 - CLI behavior
 
@@ -652,9 +652,9 @@ For most changes, read files in this order:
 
 Typical task entry points:
 
-- recording lifecycle: `src/main_record.cpp`, `include/Session.hpp`, `src/Session.cpp`
+- recording lifecycle: `src/main_record.cpp`, `include/RecordingSession.hpp`, `src/RecordingSession.cpp`
 - video pipeline: `include/VideoRecorder.hpp`, `src/VideoRecorder.cpp`
-- input capture and binary framing: `include/InputLogger.hpp`, `src/InputLogger.cpp`, `include/BinaryIO.hpp`
+- input capture and binary framing: `include/GamepadLogger.hpp`, `src/GamepadLogger.cpp`, `include/BinaryIO.hpp`
 - disabled replay path: `include/Replayer.hpp`, `src/Replayer.cpp`, `src/main_convert.cpp`
 
 ## Current Supported Output

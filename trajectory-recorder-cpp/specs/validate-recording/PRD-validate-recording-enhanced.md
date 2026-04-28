@@ -91,7 +91,7 @@ Walk the recording and print a structured summary for each session.
 
 #### Additional required statistics
 
-##### Session duration and timing
+##### Recording session duration and timing
 
 - first frame timestamp
 - last frame timestamp

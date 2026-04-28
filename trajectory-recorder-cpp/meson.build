@@ -54,11 +54,11 @@ virtual_gamepad_lib = static_library(
 core_lib = static_library(
   'recorder_core',
   [
-    'src/Session.cpp',
-    'src/CaptureSelection.cpp',
+    'src/RecordingSession.cpp',
+    'src/ScreenCaptureSelection.cpp',
     'src/VideoRecorder.cpp',
-    'src/InputLogger.cpp',
-    'src/SyncLogger.cpp',
+    'src/GamepadLogger.cpp',
+    'src/FrameTimestampLogger.cpp',
     # 'src/Replayer.cpp',  # required for convert_dataset, requires OpenCV
   ],
   generated_protos,
@@ -83,7 +83,7 @@ executable(
   'record_session',
   [
     'src/main_record.cpp',
-    'src/CaptureSelector.cpp',
+    'src/ScreenCaptureSelector.cpp',
   ],
   include_directories : inc_dir,
   link_with : core_lib,
@@ -165,22 +165,22 @@ test(
 )
 
 test(
-  'capture_selection',
+  'screen_capture_selection',
   executable(
-    'capture_selection_tests',
+    'screen_capture_selection_tests',
     [
-      'tests/CaptureSelectionTests.cpp',
-      'src/CaptureSelection.cpp',
+      'tests/ScreenCaptureSelectionTests.cpp',
+      'src/ScreenCaptureSelection.cpp',
     ],
     include_directories : test_inc_dir,
   ),
 )
 
 test(
-  'input_logger_verbose',
+  'gamepad_logger_verbose',
   executable(
-    'input_logger_verbose_tests',
-    'tests/InputLoggerVerboseTests.cpp',
+    'gamepad_logger_verbose_tests',
+    'tests/GamepadLoggerVerboseTests.cpp',
     include_directories : inc_dir,
     link_with : core_lib,
     cpp_args : ['-I' + (meson.current_build_dir() / 'librecorder_core.a.p')],

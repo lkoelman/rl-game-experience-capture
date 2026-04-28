@@ -26,11 +26,11 @@ std::string FormatVerboseState(const GamepadState& state);
 // physical pad -> SDL in recorder -> ViGEm virtual Xbox pad -> game
 //
 // Physical-device hiding is still handled outside this class via HidHide or
-// equivalent tooling; InputLogger only mirrors state into the virtual device.
-class InputLogger {
+// equivalent tooling; GamepadLogger only mirrors state into the virtual device.
+class GamepadLogger {
 public:
-    explicit InputLogger(const std::string& output_path, bool verbose = false);
-    ~InputLogger();
+    explicit GamepadLogger(const std::string& output_path, bool verbose = false);
+    ~GamepadLogger();
 
     // Opens the output file and initializes SDL.
     void Start();

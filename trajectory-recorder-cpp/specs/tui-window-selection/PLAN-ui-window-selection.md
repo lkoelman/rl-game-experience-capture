@@ -2,14 +2,14 @@
 
 ## Summary
 
-Add a Windows-only target-selection step before `Session` starts so `record_session` can capture either a chosen monitor or a chosen window instead of always using the default `d3d11screencapturesrc` target.
+Add a Windows-only target-selection step before `RecordingSession` starts so `record_session` can capture either a chosen monitor or a chosen window instead of always using the default `d3d11screencapturesrc` target.
 
 The flow should be:
 
 - Parse CLI args first.
 - If `--monitor <id>` or `--window <title>` is provided, resolve it and skip the TUI.
 - Otherwise launch an FTXUI selector before GStreamer/session startup.
-- Pass the resolved capture target into `Session` and then into `VideoRecorder`, which will set `d3d11screencapturesrc monitor-index` or `window-handle` in the pipeline string.
+- Pass the resolved capture target into `RecordingSession` and then into `VideoRecorder`, which will set `d3d11screencapturesrc monitor-index` or `window-handle` in the pipeline string.
 
 Chosen defaults from the planning pass:
 
@@ -28,16 +28,16 @@ Chosen defaults from the planning pass:
 - Update usage/help text in `include/RecordCli.hpp` and README to document:
   - `record_session [output_dir] [session_name] [--monitor <id> | --window <title>]`
   - that the TUI appears when neither selector flag is provided
-- In `src/main_record.cpp`, resolve the capture target before GStreamer init and before constructing `Session`.
+- In `src/main_record.cpp`, resolve the capture target before GStreamer init and before constructing `RecordingSession`.
 
 ### Capture target model and recorder integration
 
-- Introduce a small public capture-target type used by CLI, `Session`, and `VideoRecorder`, for example:
+- Introduce a small public capture-target type used by CLI, `RecordingSession`, and `VideoRecorder`, for example:
   - `CaptureMode::monitor`
   - `CaptureMode::window`
   - monitor target with user-facing ID + resolved zero-based monitor index
   - window target with resolved `HWND`
-- Change `Session` construction to accept the resolved capture target and forward it to `VideoRecorder`.
+- Change `RecordingSession` construction to accept the resolved capture target and forward it to `VideoRecorder`.
 - Replace the current single-argument pipeline builder in `include/VideoRecorderPipeline.hpp` with a variant that injects the correct `d3d11screencapturesrc` properties:
   - monitor capture: `monitor-index=<resolved_zero_based_index>`
   - window capture: `window-handle=<HWND_as_uint64>`
@@ -71,7 +71,7 @@ Chosen defaults from the planning pass:
 
 - `record_cli::Options` gains optional capture-selection fields.
 - `TryParseArguments()` behavior expands to named options plus existing positional args.
-- `Session` constructor gains a capture-target parameter.
+- `RecordingSession` constructor gains a capture-target parameter.
 - `VideoRecorder` constructor and pipeline builder gain a capture-target parameter.
 - New selector-facing types should stay small and explicit, e.g. `CaptureTarget`, `MonitorInfo`, `WindowInfo`, `SelectionResult`.
 

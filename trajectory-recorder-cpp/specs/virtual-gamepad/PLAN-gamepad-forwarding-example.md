@@ -3,7 +3,7 @@
   ## Summary
 
   Integrate thirdparty/ViGEmClient as an in-tree Meson-built static dependency, without removing or modifying the existing CMake files beyond leaving them unused. Add a new Windows-only console sample
-  executable that reads one physical SDL gamepad and forwards its state to a ViGEm virtual Xbox 360 controller. Do not change InputLogger yet.
+  executable that reads one physical SDL gamepad and forwards its state to a ViGEm virtual Xbox 360 controller. Do not change GamepadLogger yet.
 
   This sample is for integration validation only: build/link correctness, driver connectivity, SDL event capture, and end-to-end forwarding through a virtual pad visible to games.
 
@@ -19,7 +19,7 @@
       - Add subdir('thirdparty/ViGEmClient').
       - Define a vigemclient_dep from the submodule Meson target.
       - Add a new Windows-only executable target for the sample, separate from record_session.
-      - Do not link ViGEm into core_lib or InputLogger yet; keep the integration isolated behind the sample.
+      - Do not link ViGEm into core_lib or GamepadLogger yet; keep the integration isolated behind the sample.
   - Add a new sample executable in src/, as a minimal CLI.
       - Suggested target name: virtual_gamepad_bridge.
       - Responsibilities:

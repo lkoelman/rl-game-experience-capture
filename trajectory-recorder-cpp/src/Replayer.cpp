@@ -68,7 +68,7 @@ void TrajectoryReplayer::LoadActions(const std::string& path) {
     }
 
     while (input.peek() != std::char_traits<char>::eof()) {
-        // The input stream format matches BinaryIO + protobuf serialization from InputLogger.
+        // The input stream format matches BinaryIO + protobuf serialization from GamepadLogger.
         const auto payload = ReadLengthPrefixedPayload(input);
         GamepadState state;
         if (!state.ParseFromArray(payload.data(), static_cast<int>(payload.size()))) {

@@ -1,4 +1,4 @@
-#include "InputLogger.hpp"
+#include "GamepadLogger.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -109,14 +109,14 @@ std::string FormatVerboseState(const GamepadState& state) {
     return formatted.str();
 }
 
-InputLogger::InputLogger(const std::string& output_path, bool verbose) : output_path_(output_path), verbose_(verbose) {
+GamepadLogger::GamepadLogger(const std::string& output_path, bool verbose) : output_path_(output_path), verbose_(verbose) {
     state_mutex_ = SDL_CreateMutex();
     if (state_mutex_ == nullptr) {
         throw std::runtime_error("failed to create SDL mutex");
     }
 }
 
-class InputLogger::VirtualGamepadForwarder {
+class GamepadLogger::VirtualGamepadForwarder {
 public:
     // Brings up the recorder-owned virtual Xbox pad before recording starts.
     // This is the concrete PRD workaround for "logger sees input, game does
@@ -205,14 +205,14 @@ private:
     bool has_previous_report_{false};
 };
 
-InputLogger::~InputLogger() {
+GamepadLogger::~GamepadLogger() {
     Stop();
     if (state_mutex_ != nullptr) {
         SDL_DestroyMutex(state_mutex_);
     }
 }
 
-void InputLogger::Start() {
+void GamepadLogger::Start() {
     if (is_running_.exchange(true)) {
         return;
     }
@@ -267,7 +267,7 @@ void InputLogger::Start() {
     }
 }
 
-void InputLogger::PumpEventsOnce() {
+void GamepadLogger::PumpEventsOnce() {
     if (!is_running_) {
         return;
     }
@@ -390,7 +390,7 @@ void InputLogger::PumpEventsOnce() {
     }
 }
 
-void InputLogger::Stop() {
+void GamepadLogger::Stop() {
     if (!is_running_.exchange(false)) {
         return;
     }
@@ -409,7 +409,7 @@ void InputLogger::Stop() {
     SDL_QuitSubSystem(SDL_INIT_GAMEPAD | SDL_INIT_EVENTS);
 }
 
-void InputLogger::WriteState(const GamepadState& state) {
+void GamepadLogger::WriteState(const GamepadState& state) {
     std::string payload;
     if (!state.SerializeToString(&payload)) {
         throw std::runtime_error("failed to serialize gamepad state");
@@ -417,7 +417,7 @@ void InputLogger::WriteState(const GamepadState& state) {
     WriteLengthPrefixedPayload(out_bin_, payload);
 }
 
-GamepadState InputLogger::SnapshotState(std::uint64_t monotonic_ns) const {
+GamepadState GamepadLogger::SnapshotState(std::uint64_t monotonic_ns) const {
     GamepadState state;
     state.set_monotonic_ns(monotonic_ns);
 

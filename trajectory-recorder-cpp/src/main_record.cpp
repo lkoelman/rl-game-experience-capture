@@ -13,9 +13,9 @@
 
 #include <gst/gst.h>
 
-#include "CaptureSelector.hpp"
+#include "ScreenCaptureSelector.hpp"
 #include "RecordCli.hpp"
-#include "Session.hpp"
+#include "RecordingSession.hpp"
 
 std::atomic<bool> g_shutdown_requested{false};
 
@@ -145,31 +145,31 @@ int main(int argc, char* argv[]) {
 
     stage = trajectory::record_cli::RunStage::signal_handler_installation;
     try {
-        // GStreamer must be initialized before Session constructs the recorder pipeline.
+        // GStreamer must be initialized before RecordingSession constructs the recorder pipeline.
         stage = trajectory::record_cli::RunStage::gstreamer_initialization;
         std::cout << "Initializing GStreamer..." << std::endl;
         gst_init(&argc, &argv);
 
         stage = trajectory::record_cli::RunStage::session_construction;
         std::cout << "Preparing output session..." << std::endl;
-        trajectory::Session session(options.output_dir, options.session_name, capture_target, options.verbose);
+        trajectory::RecordingSession recording_session(options.output_dir, options.session_name, capture_target, options.verbose);
 
         stage = trajectory::record_cli::RunStage::session_start;
         std::cout << "Starting recording session..." << std::endl;
-        session.Start();
+        recording_session.Start();
 
         stage = trajectory::record_cli::RunStage::wait_for_shutdown;
         std::cout << "Recording... Press Ctrl+C to stop." << std::endl;
         while (!g_shutdown_requested) {
-            session.PumpEventsOnce();
+            recording_session.PumpEventsOnce();
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
-        // Session owns the coordinated shutdown order for recorder components.
+        // RecordingSession owns the coordinated shutdown order for recorder components.
         std::cout << "\nShutdown requested. Stopping recording session..." << std::endl;
         stage = trajectory::record_cli::RunStage::session_stop;
-        session.Stop();
-        std::cout << "Session saved successfully." << std::endl;
+        recording_session.Stop();
+        std::cout << "Recording session saved successfully." << std::endl;
     } catch (const std::exception& error) {
         std::cerr << "Error while " << trajectory::record_cli::DescribeStage(stage) << ": " << error.what() << std::endl;
         return 1;

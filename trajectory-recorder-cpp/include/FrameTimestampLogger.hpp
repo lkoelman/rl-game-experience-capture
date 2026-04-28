@@ -8,10 +8,10 @@
 namespace trajectory {
 
 // Appends the video-side timestamp mapping used for offline frame/action alignment.
-class SyncLogger {
+class FrameTimestampLogger {
 public:
-    explicit SyncLogger(const std::string& filepath);
-    ~SyncLogger();
+    explicit FrameTimestampLogger(const std::string& filepath);
+    ~FrameTimestampLogger();
 
     // Thread-safe append of one observed frame and its timestamps.
     void LogFrame(std::uint64_t monotonic_ns, std::uint64_t pts);

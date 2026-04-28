@@ -9,14 +9,14 @@
 #include <thread>
 
 #include "CaptureTarget.hpp"
-#include "SyncLogger.hpp"
+#include "FrameTimestampLogger.hpp"
 
 namespace trajectory {
 
 // Owns the GStreamer pipeline that captures video and emits sync timestamps.
 class VideoRecorder {
 public:
-    VideoRecorder(const std::string& output_path, CaptureTarget capture_target, std::shared_ptr<SyncLogger> sync_logger);
+    VideoRecorder(const std::string& output_path, CaptureTarget capture_target, std::shared_ptr<FrameTimestampLogger> frame_timestamp_logger);
     ~VideoRecorder();
 
     // Builds the pipeline, attaches the probe, and starts the GLib main loop thread.
@@ -34,7 +34,7 @@ private:
     static gboolean BusCall(GstBus* bus, GstMessage* msg, gpointer data);
 
     std::string output_path_;
-    std::shared_ptr<SyncLogger> sync_logger_;
+    std::shared_ptr<FrameTimestampLogger> frame_timestamp_logger_;
     GstElement* pipeline_{nullptr};
     GMainLoop* loop_{nullptr};
     std::thread loop_thread_;

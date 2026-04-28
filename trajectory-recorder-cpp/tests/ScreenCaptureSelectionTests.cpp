@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-#include "CaptureSelection.hpp"
+#include "ScreenCaptureSelection.hpp"
 #include "TestWindowsSetup.hpp"
 
 namespace {

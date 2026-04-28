@@ -1,6 +1,6 @@
 ## Question: Gamepad Logging
 
-Help me solve the following bug: when recording the gamepad using InputLogger (see attached C++ code) and SDL3, the gamepad events do not reach my video game. It looks like reading the gamepad events consumes them so that other video games cannot use the gamepad inputs simultaneously. Can I work around this? If yes, how should I change the architecture to ensure that recorded gamepad events reach my video game?
+Help me solve the following bug: when recording the gamepad using GamepadLogger (see attached C++ code) and SDL3, the gamepad events do not reach my video game. It looks like reading the gamepad events consumes them so that other video games cannot use the gamepad inputs simultaneously. Can I work around this? If yes, how should I change the architecture to ensure that recorded gamepad events reach my video game?
 
 For reference, I've identified several "virtual gamepad" libraries that may be useful:
 - https://github.com/nefarius/ViGEmBus  (archived, would probably need patching)
@@ -9,11 +9,11 @@ For reference, I've identified several "virtual gamepad" libraries that may be u
 
 ## Answer (Gemini 3 Pro)
 
-The issue you are experiencing—where reading gamepad events "consumes" them and prevents your game from seeing them—almost certainly depends on whether your `InputLogger` is running inside the **same process** (integrated into your game's code) or as a **separate background application**.
+The issue you are experiencing—where reading gamepad events "consumes" them and prevents your game from seeing them—almost certainly depends on whether your `GamepadLogger` is running inside the **same process** (integrated into your game's code) or as a **separate background application**.
 
 Here is how to solve the problem for both architectural scenarios.
 
-### Scenario A: `InputLogger` is running in the same process as your game
+### Scenario A: `GamepadLogger` is running in the same process as your game
 If you compiled this logger directly into your game or engine, the bug is in this specific line inside `PumpEventsOnce()`:
 ```cpp
 while (SDL_PollEvent(&event)) { ... }
@@ -30,7 +30,7 @@ while (SDL_PollEvent(&event)) { ... }
 
 ---
 
-### Scenario B: `InputLogger` is a separate standalone application
+### Scenario B: `GamepadLogger` is a separate standalone application
 If your logger is an entirely separate executable running alongside the game, standard Windows XInput/DirectInput normally allows multiple applications to read the same controller simultaneously. However, if your game requests exclusive access, or if you are specifically trying to build an architecture that intercepts inputs to modify or log them transparently without the game knowing, you will need the **Virtual Gamepad Proxy Architecture**.
 
 This aligns exactly with the libraries you linked. Here is how you should design that architecture:
@@ -38,9 +38,9 @@ This aligns exactly with the libraries you linked. Here is how you should design
 #### The Proxy Architecture
 To achieve this, your logger must act as a "Man-in-the-Middle" between the physical hardware and the game.
 
-1. **Hide the Physical Controller:** You must use a kernel-level filter driver like **HidHide** (standard in the Windows emulation community). You configure HidHide to make your physical gamepad invisible to all applications *except* your `InputLogger`.
-2. **Read the Inputs:** Your `InputLogger` (which is whitelisted by HidHide) reads the physical gamepad via SDL3.
-3. **Emit Virtual Inputs:** Your `InputLogger` translates the SDL3 state and feeds it into a **Virtual Gamepad Library**.
+1. **Hide the Physical Controller:** You must use a kernel-level filter driver like **HidHide** (standard in the Windows emulation community). You configure HidHide to make your physical gamepad invisible to all applications *except* your `GamepadLogger`.
+2. **Read the Inputs:** Your `GamepadLogger` (which is whitelisted by HidHide) reads the physical gamepad via SDL3.
+3. **Emit Virtual Inputs:** Your `GamepadLogger` translates the SDL3 state and feeds it into a **Virtual Gamepad Library**.
 4. **The Game Plays:** The video game sees only the Virtual Gamepad (since the physical one is hidden) and reads the inputs normally.
 
 #### Evaluating your Library Options
@@ -132,14 +132,14 @@ Looking at your `scripts/build.ps1`, you already handle GStreamer by pointing Me
 1.  **Documentation:** Update your `README.md` to instruct users that they **must install the ViGEmBus driver** on their Windows machine before using the software.
 2.  **SDK Placement:** Download the ViGEmClient SDK, drop the headers and `.lib` files into a new `third_party/vigemclient` directory in your repo.
 3.  **Build System:** Update `meson.build` with the `declare_dependency` block from Option 1.
-4.  **Integration:** In your `InputLogger` or new `VirtualGamepad` C++ class, simply `#include <ViGEm/Client.h>` and start emitting inputs. You won't need to change `conanfile.txt` or `build.ps1` at all.
+4.  **Integration:** In your `GamepadLogger` or new `VirtualGamepad` C++ class, simply `#include <ViGEm/Client.h>` and start emitting inputs. You won't need to change `conanfile.txt` or `build.ps1` at all.
 
 
 ## Question: Integration using Git Submodule and Meson
 
 Circling back to the question about integration using Windows. The official README for ViGEMClient states "Integrating this library into your project is pretty straight-forward, there are no additional 3rd party dependencies. You can either git submodule or git subtree this repository directly into your source tree or use the provided vcpkg package manager integration found here (recommended, can be updated with ease). The library tries to handle driver compatibility internally so static linking is recommended to avoid DLL hell."
 
-Suggest a strategy for rewriting the CMake build files using Meson, integrating the repo as a submodule into my InputLogger repository, and integrate the library cleanly using Meson.
+Suggest a strategy for rewriting the CMake build files using Meson, integrating the repo as a submodule into my GamepadLogger repository, and integrate the library cleanly using Meson.
 
 ## Answer (Gemini 3 Pro)
 
@@ -216,8 +216,8 @@ subdir('subprojects')
 core_lib = static_library(
   'recorder_core',
   [
-    'src/Session.cpp',
-    'src/InputLogger.cpp',
+    'src/RecordingSession.cpp',
+    'src/GamepadLogger.cpp',
     # ... other files ...
   ],
   generated_protos,
@@ -230,7 +230,7 @@ core_lib = static_library(
 
 With the Meson plumbing finished, your build system now natively compiles the ViGEmClient C++ source into a static object, links it against Windows `setupapi.lib`, and bundles it into your `recorder_core`.
 
-You can immediately start using it in your `InputLogger.cpp` or a new `VirtualGamepad.cpp` class without touching `conanfile.txt` or `build.ps1`:
+You can immediately start using it in your `GamepadLogger.cpp` or a new `VirtualGamepad.cpp` class without touching `conanfile.txt` or `build.ps1`:
 
 ```cpp
 // Windows specific headers must usually precede ViGEm headers

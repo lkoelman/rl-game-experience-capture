@@ -9,7 +9,7 @@
 
 namespace trajectory {
 
-// Shared framing helper for on-disk binary records written by InputLogger.
+// Shared framing helper for on-disk binary records written by GamepadLogger.
 inline void WriteUint32LittleEndian(std::ostream& out, std::uint32_t value) {
     const std::array<char, 4> bytes{
         static_cast<char>(value & 0xffu),
