@@ -128,7 +128,7 @@ After building, run the executables:
 
 ### Record Game Sesion
 
-`record_session` now supports pre-recording capture selection:
+`record_session` supports pre-recording capture selection:
 
 - `--monitor <id>` selects a monitor by the one-based ID shown in the selector
 - `--window <title>` selects a titled window by case-insensitive substring match
@@ -148,7 +148,8 @@ $env:PATH = "$env:GSTREAMER_1_0_ROOT_X86_64\bin;$env:PATH"
 
 When running `record_session.exe` from PowerShell on Windows, use a Developer PowerShell and make sure the GStreamer runtime `bin` directory is on `PATH`. If Windows cannot load the GStreamer DLLs, the process can exit before `main()` starts and you will see no program output.
 The recorder also pumps SDL input events on the main thread. If that polling is moved to a worker thread, SDL 3 can raise assertion popups on Windows.
-`record_session` now also creates a virtual Xbox 360 controller through ViGEmBus and forwards the tracked physical gamepad into it while it logs `actions.bin`. If a game should see only the forwarded virtual controller, hide the physical device separately with [HidHide](https://github.com/nefarius/HidHide) or equivalent tooling before you start recording.
+`record_session` creates a virtual Xbox 360 controller through ViGEmBus before recording starts, then forwards the tracked physical gamepad into it during both the pre-recording test phase and the recording phase. The pre-recording phase prints rate-limited forwarded button lines in the same format as `virtual_gamepad_bridge`, so you can launch the target game, work through menus, confirm the virtual controller is behaving correctly, and press `Space` when the actual capture should begin. Once recording starts, the forwarded-input echo stops and `actions.bin`, `sync.csv`, and `capture.mp4` begin.
+If a game should see only the forwarded virtual controller, hide the physical device separately with [HidHide](https://github.com/nefarius/HidHide) or equivalent tooling before you start recording.
 
 Example:
 

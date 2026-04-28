@@ -10,6 +10,7 @@
 #include <string>
 #include <unordered_set>
 
+#include "GamepadPump.hpp"
 #include "gamepad.pb.h"
 
 namespace trajectory {
@@ -32,8 +33,17 @@ public:
     explicit GamepadLogger(const std::string& output_path, bool verbose = false);
     ~GamepadLogger();
 
-    // Opens the output file and initializes SDL.
+    // Opens the output file and initializes SDL, then starts recording immediately.
     void Start();
+
+    // Initializes SDL and the virtual controller without opening actions.bin.
+    void StartForwarding();
+
+    // Opens actions.bin and starts writing snapshots for subsequent input changes.
+    void BeginRecording();
+
+    // Pumps pending SDL events on the calling thread in the selected mode.
+    GamepadPumpResult PumpEventsOnce(GamepadPumpMode mode);
 
     // Pumps pending SDL events on the calling thread.
     // Each input mutation updates the cached state and writes one full protobuf snapshot.
@@ -60,7 +70,8 @@ private:
     std::string output_path_;
     bool verbose_{false};
     std::ofstream out_bin_;
-    std::atomic<bool> is_running_{false};
+    std::atomic<bool> is_forwarding_{false};
+    bool is_recording_{false};
     mutable SDL_Mutex* state_mutex_{nullptr};
     SDL_Gamepad* gamepad_{nullptr};
     SDL_JoystickID gamepad_instance_id_{0};

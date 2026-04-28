@@ -1,0 +1,3 @@
+When using the `record_session` binary, we currently start recording immediately. Instead, we want to create the virtual gamepad first, echo the forwarded gamepad inputs (just like in the virtual gamepad bridge sample application), then ask the user to confirm (using the keyboard Space key) to start recording. Show a message like "Test the gamepad now. Confirm if the forwarded inputs look good". Upon starting the recording, the gamepad inputs should stop being echoed to the screen.
+
+The goal is to be able to create and "connect" the virtual gamepad before we launch our video game, so that it is immediately detected when the game is started, but delay the actual recording until we've worked through the menu screens in the game.

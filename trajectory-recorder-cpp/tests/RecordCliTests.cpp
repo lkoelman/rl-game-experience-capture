@@ -67,6 +67,12 @@ void TestBlankOutputDirectoryFailsClearly() {
 
 void TestFailureMessagesNameTheLifecycleStage() {
     Expect(
+        std::string(trajectory::record_cli::DescribeStage(trajectory::record_cli::RunStage::input_preview_start)) == "starting gamepad input preview",
+        "input preview startup failures should name the preview stage");
+    Expect(
+        std::string(trajectory::record_cli::DescribeStage(trajectory::record_cli::RunStage::wait_for_recording_confirmation)) == "waiting for recording confirmation",
+        "confirmation failures should name the confirmation stage");
+    Expect(
         std::string(trajectory::record_cli::DescribeStage(trajectory::record_cli::RunStage::session_start)) == "starting the recording session",
         "session start failures should name the startup stage");
     Expect(

@@ -30,8 +30,21 @@ RecordingSession::RecordingSession(const std::string& output_dir, const std::str
 RecordingSession::~RecordingSession() = default;
 
 void RecordingSession::Start() {
-    // Input starts first so the earliest controller/keyboard events are captured before video is live.
-    gamepad_logger_->Start();
+    StartInputPreview();
+    StartRecording();
+}
+
+void RecordingSession::StartInputPreview() {
+    gamepad_logger_->StartForwarding();
+}
+
+GamepadPumpResult RecordingSession::PumpInputPreviewOnce() {
+    return gamepad_logger_->PumpEventsOnce(GamepadPumpMode::preview);
+}
+
+void RecordingSession::StartRecording() {
+    // Input recording starts first so the initial controller state is captured before video is live.
+    gamepad_logger_->BeginRecording();
     video_recorder_->Start();
 }
 

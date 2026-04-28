@@ -31,6 +31,8 @@ enum class RunStage {
     signal_handler_installation,
     gstreamer_initialization,
     session_construction,
+    input_preview_start,
+    wait_for_recording_confirmation,
     session_start,
     wait_for_shutdown,
     session_stop,
@@ -62,6 +64,10 @@ inline const char* DescribeStage(RunStage stage) {
         return "initializing GStreamer";
     case RunStage::session_construction:
         return "preparing the output session";
+    case RunStage::input_preview_start:
+        return "starting gamepad input preview";
+    case RunStage::wait_for_recording_confirmation:
+        return "waiting for recording confirmation";
     case RunStage::session_start:
         return "starting the recording session";
     case RunStage::wait_for_shutdown:

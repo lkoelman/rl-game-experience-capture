@@ -159,21 +159,30 @@ public:
         state_ = {};
     }
 
-    void ApplyAxisMotion(SDL_GamepadAxis axis, short value) {
+    bool ApplyAxisMotion(SDL_GamepadAxis axis, short value) {
         virtual_gamepad::ApplyAxisMotion(state_, axis, value);
-        SubmitState(state_);
+        return SubmitState(state_);
     }
 
-    void ApplyButtonChange(SDL_GamepadButton button, bool pressed) {
+    bool ApplyButtonChange(SDL_GamepadButton button, bool pressed) {
         virtual_gamepad::ApplyButtonChange(state_, button, pressed);
-        SubmitState(state_);
+        return SubmitState(state_);
     }
 
     // Device removal should release all virtual inputs immediately. Without
     // this reset, the game could continue seeing a stuck stick/button state.
-    void ResetPhysicalState() {
+    bool ResetPhysicalState() {
         state_ = {};
-        SubmitState(state_);
+        return SubmitState(state_);
+    }
+
+    std::string VirtualGamepadId() const {
+        ULONG user_index = 0;
+        if (client_ != nullptr && target_ != nullptr &&
+            VIGEM_SUCCESS(vigem_target_x360_get_user_index(client_, target_, &user_index))) {
+            return std::to_string(user_index);
+        }
+        return "virtual";
     }
 
     ~VirtualGamepadForwarder() {
@@ -181,21 +190,22 @@ public:
     }
 
 private:
-    void SubmitState(const virtual_gamepad::PhysicalGamepadState& state) {
+    bool SubmitState(const virtual_gamepad::PhysicalGamepadState& state) {
         if (client_ == nullptr || target_ == nullptr) {
-            return;
+            return false;
         }
 
         const XUSB_REPORT next_report = virtual_gamepad::BuildXusbReport(state);
         // ViGEm traffic stays event-driven and minimal: we submit only when the
         // full virtual report bytes changed after an SDL mutation.
         if (has_previous_report_ && !virtual_gamepad::ReportsDiffer(previous_report_, next_report)) {
-            return;
+            return false;
         }
 
         ThrowIfVigemFailed("submitting XUSB report", vigem_target_x360_update(client_, target_, next_report));
         previous_report_ = next_report;
         has_previous_report_ = true;
+        return true;
     }
 
     PVIGEM_CLIENT client_{nullptr};
@@ -213,28 +223,25 @@ GamepadLogger::~GamepadLogger() {
 }
 
 void GamepadLogger::Start() {
-    if (is_running_.exchange(true)) {
-        return;
-    }
+    StartForwarding();
+    BeginRecording();
+}
 
-    out_bin_.open(output_path_, std::ios::binary | std::ios::out | std::ios::trunc);
-    if (!out_bin_.is_open()) {
-        is_running_ = false;
-        throw std::runtime_error("failed to open actions binary: " + output_path_);
+void GamepadLogger::StartForwarding() {
+    if (is_forwarding_.exchange(true)) {
+        return;
     }
 
     // The recorder usually loses focus once the game window becomes active.
     // Background controller events are therefore required for both logging and
     // forwarding to continue while the game is being played.
     if (!SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1")) {
-        out_bin_.close();
-        is_running_ = false;
+        is_forwarding_ = false;
         throw std::runtime_error("failed to enable SDL background gamepad events");
     }
 
     if (!SDL_Init(SDL_INIT_EVENTS | SDL_INIT_GAMEPAD)) {
-        out_bin_.close();
-        is_running_ = false;
+        is_forwarding_ = false;
         throw std::runtime_error(SDL_GetError());
     }
 
@@ -245,8 +252,7 @@ void GamepadLogger::Start() {
         virtual_gamepad_forwarder_->Start();
     } catch (...) {
         SDL_QuitSubSystem(SDL_INIT_GAMEPAD | SDL_INIT_EVENTS);
-        out_bin_.close();
-        is_running_ = false;
+        is_forwarding_ = false;
         virtual_gamepad_forwarder_.reset();
         throw;
     }
@@ -267,10 +273,37 @@ void GamepadLogger::Start() {
     }
 }
 
-void GamepadLogger::PumpEventsOnce() {
-    if (!is_running_) {
+void GamepadLogger::BeginRecording() {
+    if (!is_forwarding_) {
+        StartForwarding();
+    }
+    if (is_recording_) {
         return;
     }
+
+    out_bin_.open(output_path_, std::ios::binary | std::ios::out | std::ios::trunc);
+    if (!out_bin_.is_open()) {
+        throw std::runtime_error("failed to open actions binary: " + output_path_);
+    }
+
+    GamepadState initial_snapshot;
+    SDL_LockMutex(state_mutex_);
+    initial_snapshot = SnapshotState(NowMonotonicNs());
+    SDL_UnlockMutex(state_mutex_);
+    WriteState(initial_snapshot);
+    if (verbose_) {
+        std::cout << FormatVerboseState(initial_snapshot) << std::endl;
+    }
+    is_recording_ = true;
+}
+
+GamepadPumpResult GamepadLogger::PumpEventsOnce(GamepadPumpMode mode) {
+    GamepadPumpResult pump_result;
+    if (!is_forwarding_) {
+        return pump_result;
+    }
+
+    static virtual_gamepad::ForwardingLogRateLimiter preview_log_rate_limiter(30);
 
     SDL_Event event;
     bool saw_event = false;
@@ -280,11 +313,14 @@ void GamepadLogger::PumpEventsOnce() {
     while (SDL_PollEvent(&event)) {
         saw_event = true;
         bool state_changed = false;
+        bool forwarded_report_changed = false;
+        bool forwarded_button_changed = false;
+        SDL_GamepadButton forwarded_button = SDL_GAMEPAD_BUTTON_INVALID;
 
         SDL_LockMutex(state_mutex_);
         switch (event.type) {
         case SDL_EVENT_QUIT:
-            is_running_ = false;
+            pump_result.shutdown_requested = true;
             break;
         case SDL_EVENT_GAMEPAD_ADDED:
             // Track one controller. The logger records state, not per-device identity.
@@ -327,7 +363,8 @@ void GamepadLogger::PumpEventsOnce() {
             if (virtual_gamepad_forwarder_ != nullptr) {
                 // The game sees the forwarded virtual state, while actions.bin
                 // still records the observed physical state for offline use.
-                virtual_gamepad_forwarder_->ApplyAxisMotion(static_cast<SDL_GamepadAxis>(event.gaxis.axis), event.gaxis.value);
+                forwarded_report_changed =
+                    virtual_gamepad_forwarder_->ApplyAxisMotion(static_cast<SDL_GamepadAxis>(event.gaxis.axis), event.gaxis.value);
             }
             state_changed = true;
             break;
@@ -336,28 +373,38 @@ void GamepadLogger::PumpEventsOnce() {
                 break;
             }
             // Store pressed buttons as SDL_GamepadButton enum ids.
+            forwarded_button = static_cast<SDL_GamepadButton>(event.gbutton.button);
             if (virtual_gamepad_forwarder_ != nullptr) {
-                virtual_gamepad_forwarder_->ApplyButtonChange(static_cast<SDL_GamepadButton>(event.gbutton.button), true);
+                forwarded_report_changed = virtual_gamepad_forwarder_->ApplyButtonChange(forwarded_button, true);
             }
+            forwarded_button_changed = true;
             state_changed = pressed_buttons_.insert(event.gbutton.button).second;
             break;
         case SDL_EVENT_GAMEPAD_BUTTON_UP:
             if (gamepad_ == nullptr || event.gbutton.which != gamepad_instance_id_) {
                 break;
             }
+            forwarded_button = static_cast<SDL_GamepadButton>(event.gbutton.button);
             if (virtual_gamepad_forwarder_ != nullptr) {
-                virtual_gamepad_forwarder_->ApplyButtonChange(static_cast<SDL_GamepadButton>(event.gbutton.button), false);
+                forwarded_report_changed = virtual_gamepad_forwarder_->ApplyButtonChange(forwarded_button, false);
             }
+            forwarded_button_changed = true;
             state_changed = pressed_buttons_.erase(event.gbutton.button) > 0;
             break;
         case SDL_EVENT_KEY_DOWN:
+            if (mode == GamepadPumpMode::preview && !event.key.repeat && event.key.scancode == SDL_SCANCODE_SPACE) {
+                pump_result.start_recording_requested = true;
+                break;
+            }
             // Keyboard keys are fallback/auxiliary controls stored as SDL_Scancode ids.
-            if (!event.key.repeat) {
+            if (mode == GamepadPumpMode::recording && !event.key.repeat) {
                 state_changed = pressed_keys_.insert(event.key.scancode).second;
             }
             break;
         case SDL_EVENT_KEY_UP:
-            state_changed = pressed_keys_.erase(event.key.scancode) > 0;
+            if (mode == GamepadPumpMode::recording) {
+                state_changed = pressed_keys_.erase(event.key.scancode) > 0;
+            }
             break;
         default:
             break;
@@ -375,7 +422,16 @@ void GamepadLogger::PumpEventsOnce() {
         }
         SDL_UnlockMutex(state_mutex_);
 
-        if (state_changed) {
+        if (mode == GamepadPumpMode::preview && forwarded_report_changed && forwarded_button_changed &&
+            virtual_gamepad_forwarder_ != nullptr && preview_log_rate_limiter.ShouldEmit(NowMonotonicNs())) {
+            std::cout << virtual_gamepad::FormatForwardedButtonLogLine(
+                             gamepad_instance_id_,
+                             forwarded_button,
+                             virtual_gamepad_forwarder_->VirtualGamepadId())
+                      << std::endl;
+        }
+
+        if (mode == GamepadPumpMode::recording && is_recording_ && state_changed) {
             WriteState(snapshot);
             if (verbose_) {
                 std::cout << FormatVerboseState(snapshot) << std::endl;
@@ -388,10 +444,16 @@ void GamepadLogger::PumpEventsOnce() {
         // No event means no new protobuf snapshot, so long idle periods appear as gaps between records.
         SDL_Delay(1);
     }
+
+    return pump_result;
+}
+
+void GamepadLogger::PumpEventsOnce() {
+    static_cast<void>(PumpEventsOnce(GamepadPumpMode::recording));
 }
 
 void GamepadLogger::Stop() {
-    if (!is_running_.exchange(false)) {
+    if (!is_forwarding_.exchange(false)) {
         return;
     }
 
@@ -406,6 +468,7 @@ void GamepadLogger::Stop() {
     if (out_bin_.is_open()) {
         out_bin_.close();
     }
+    is_recording_ = false;
     SDL_QuitSubSystem(SDL_INIT_GAMEPAD | SDL_INIT_EVENTS);
 }
 

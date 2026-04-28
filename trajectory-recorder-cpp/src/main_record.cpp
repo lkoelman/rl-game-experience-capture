@@ -111,6 +111,18 @@ void PrintCaptureTarget(const trajectory::CaptureTarget& capture_target) {
     std::cout << "  capture_target: monitor " << capture_target.monitor_id << std::endl;
 }
 
+bool ConsumeSpaceStartRequest() {
+#ifdef _WIN32
+    static bool was_down = false;
+    const bool is_down = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
+    const bool pressed = is_down && !was_down;
+    was_down = is_down;
+    return pressed;
+#else
+    return false;
+#endif
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -154,9 +166,35 @@ int main(int argc, char* argv[]) {
         std::cout << "Preparing output session..." << std::endl;
         trajectory::RecordingSession recording_session(options.output_dir, options.session_name, capture_target, options.verbose);
 
+        stage = trajectory::record_cli::RunStage::input_preview_start;
+        std::cout << "Creating virtual gamepad and starting input forwarding..." << std::endl;
+        recording_session.StartInputPreview();
+
+        stage = trajectory::record_cli::RunStage::wait_for_recording_confirmation;
+        std::cout << "Test the gamepad now. Confirm if the forwarded inputs look good. Press Space to start recording." << std::endl;
+        static_cast<void>(ConsumeSpaceStartRequest());
+        while (!g_shutdown_requested) {
+            const auto preview_result = recording_session.PumpInputPreviewOnce();
+            if (preview_result.shutdown_requested) {
+                g_shutdown_requested = true;
+                break;
+            }
+            if (preview_result.start_recording_requested || ConsumeSpaceStartRequest()) {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+
+        if (g_shutdown_requested) {
+            std::cout << "\nShutdown requested before recording started. Stopping input forwarding..." << std::endl;
+            stage = trajectory::record_cli::RunStage::session_stop;
+            recording_session.Stop();
+            return 0;
+        }
+
         stage = trajectory::record_cli::RunStage::session_start;
         std::cout << "Starting recording session..." << std::endl;
-        recording_session.Start();
+        recording_session.StartRecording();
 
         stage = trajectory::record_cli::RunStage::wait_for_shutdown;
         std::cout << "Recording... Press Ctrl+C to stop." << std::endl;
