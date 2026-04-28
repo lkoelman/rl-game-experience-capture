@@ -47,9 +47,11 @@ Important implication for agents:
 
 - If you change dependency discovery or the build graph, read `scripts/build.ps1` first. It contains non-trivial environment and native-file patching required for a successful Windows build.
 
-## Runtime Architecture
+## Runtime Architecture: Session Recorder
 
-The runtime path for recording is:
+The `record_session` executable is built around `src/main_record.cpp`. That file owns process-level setup and shutdown, while the recorder behavior itself is delegated to `Session` and the three recorder components it owns.
+
+The high-level runtime path is:
 
 1. `src/main_record.cpp`
 2. `trajectory::CaptureSelector`
@@ -59,16 +61,51 @@ The runtime path for recording is:
 6. `trajectory::VideoRecorder`
 7. `trajectory::SyncLogger`
 
-`main_record.cpp` is a thin CLI wrapper:
+`main_record.cpp` is intentionally a thin orchestration layer:
 
 - parses capture-selection flags
 - resolves a monitor/window target from CLI or the FTXUI selector
+- prints the selected output directory, session name, verbosity, and capture target
 - initializes GStreamer with `gst_init`
-- installs console shutdown handlers
-- creates a `Session`
+- installs POSIX signal handlers and, on Windows, a console control handler
+- creates a `Session` with the resolved `CaptureTarget`
 - pumps SDL input events on the main thread while waiting for shutdown
 - blocks until Ctrl+C or another console shutdown event
 - calls `Session::Stop()`
+
+`Session` then owns the recorder components and their ordering:
+
+- construction creates the output session directory and wires `sync.csv`, `capture.mp4`, and `actions.bin`
+- `Start()` starts `InputLogger` before `VideoRecorder` so early input events and the virtual controller are available before capture begins
+- `PumpEventsOnce()` delegates to `InputLogger::PumpEventsOnce()` because SDL event polling must remain on the main thread on Windows
+- `Stop()` stops `VideoRecorder` before `InputLogger` so video and sync logging finalize before input capture exits
+
+`InputLogger` is part of the live input path, not only the persistence path. It generates virtual gamepad actions, forwarded to the game. During `InputLogger::Start()`, the logger creates a ViGEm client, connects to ViGEmBus, allocates one virtual Xbox 360 target, and submits an initial neutral report. During SDL gamepad axis/button events, it updates both:
+
+- the serialized physical input state written to `actions.bin`
+- the recorder-owned virtual controller that the target game can bind to
+
+The resulting topology during recording is:
+
+```text
+physical gamepad -> SDL events in InputLogger -> actions.bin
+physical gamepad -> SDL events in InputLogger -> ViGEmBus virtual Xbox 360 controller -> target game
+```
+
+The virtual gamepad bridge is therefore used by `InputLogger` in the recorder just like it is used by the standalone `virtual_gamepad_bridge` sample application. Both paths share the `trajectory::virtual_gamepad` translation helpers:
+
+- `PhysicalGamepadState`
+- `ApplyAxisMotion()`
+- `ApplyButtonChange()`
+- `BuildXusbReport()`
+- `ReportsDiffer()`
+
+Operational implications:
+
+- ViGEmBus must be installed for recorder startup when gamepad forwarding is enabled by the current build.
+- `actions.bin` records the observed physical SDL state, not virtual-device callbacks.
+- physical-device hiding is external to the recorder; use HidHide or equivalent when the target game should see only the forwarded virtual controller.
+- failures from ViGEm allocation, bus connection, target creation, or report submission surface as recorder startup/runtime errors through `InputLogger`.
 
 The runtime path for the virtual gamepad integration sample is:
 
