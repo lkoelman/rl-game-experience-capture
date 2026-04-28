@@ -138,6 +138,9 @@ After building, run the executables:
 Examples:
 
 ```powershell
+echo $env:GSTREAMER_1_0_ROOT_X86_64
+$env:PATH = "$env:GSTREAMER_1_0_ROOT_X86_64\bin;$env:PATH"
+
 .\builddir\record_session.exe .\data test_session --monitor 1
 .\builddir\record_session.exe .\data test_session --window "Notepad"
 .\builddir\record_session.exe .\data test_session --monitor 1 --verbose
@@ -150,7 +153,7 @@ The recorder also pumps SDL input events on the main thread. If that polling is 
 Example:
 
 ```powershell
-$env:GSTREAMER_1_0_ROOT_X86_64 = 'C:\Program Files\gstreamer\1.0\msvc_x86_64'
+$env:GSTREAMER_1_0_ROOT_X86_64 = "C:\Program Files\gstreamer\1.0\msvc_x86_64"
 $env:PATH = "$env:GSTREAMER_1_0_ROOT_X86_64\bin;$env:PATH"
 
 .\builddir\record_session.exe .\data test_session
