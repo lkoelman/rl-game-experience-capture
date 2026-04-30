@@ -18,6 +18,7 @@ uv run game2lerobot \
 ```
 
 Add `--strict` to fail the run when any discovered session directory is invalid instead of skipping it.
+Use `--verbosity debug|info|warning|error|critical` to control CLI logging output.
 
 The CLI entrypoint lives in `game2lerobot.cli`, and the package-level imports
 are exposed directly from `game2lerobot`.

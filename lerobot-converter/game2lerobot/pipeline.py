@@ -8,11 +8,13 @@ the LeRobot writer.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import numpy as np
 from lerobot.datasets.io_utils import write_info
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
+from tqdm import tqdm
 
 from .alignment import (
     collect_session_dirs,
@@ -32,6 +34,9 @@ from .models import (
     GamepadSnapshot,
 )
 from .parsing import open_video_reader, read_actions_bin, read_sync_csv
+
+
+logger = logging.getLogger(__name__)
 
 
 def convert_sessions(
@@ -62,21 +67,47 @@ def convert_sessions(
     dataset: LeRobotDataset | None = None
     expected_fps: int | None = None
 
-    for session_dir in collect_session_dirs(session_root):
+    logger.info("Scanning session root %s", session_root)
+    session_dirs = collect_session_dirs(session_root)
+    logger.info(
+        "Discovered %d session folder(s): %s",
+        len(session_dirs),
+        ", ".join(session_dir.name for session_dir in session_dirs) or "<none>",
+    )
+
+    for session_position, session_dir in enumerate(session_dirs, start=1):
+        logger.info(
+            "Handling session %s (%d/%d) at %s",
+            session_dir.name,
+            session_position,
+            len(session_dirs),
+            session_dir,
+        )
         validation = validate_session_dir(session_dir)
         if not validation.ok:
             reason = f"missing required files: {', '.join(validation.missing_files)}"
+            logger.warning("Skipping session %s: %s", session_dir.name, reason)
             if strict:
                 raise ValueError(f"{session_dir.name}: {reason}")
             skipped_sessions[session_dir.name] = reason
             continue
+        logger.info("Validation passed for session %s", session_dir.name)
 
         try:
+            logger.info("Reading session artifacts for %s", session_dir.name)
             video_reader, fps = open_video_reader(session_dir / "capture.mp4")
             frame_timestamps_ns = read_sync_csv(session_dir / "sync.csv")
             snapshots = read_actions_bin(session_dir / "actions.bin")
             if len(video_reader) != len(frame_timestamps_ns):
                 raise ValueError("frame count does not match sync.csv entries")
+            logger.info(
+                "Loaded session %s: %d video frame(s), %d sync row(s), %d action snapshot(s), %d fps",
+                session_dir.name,
+                len(video_reader),
+                len(frame_timestamps_ns),
+                len(snapshots),
+                fps,
+            )
 
             expected_fps = _resolve_expected_fps(expected_fps, fps)
             retained_indices = trim_idle_frame_indices(
@@ -88,6 +119,12 @@ def convert_sessions(
             )
             if not retained_indices:
                 raise ValueError("no frames retained after applying pre-action limit")
+            logger.info(
+                "Retaining %d/%d frame(s) for session %s after pre-action trimming",
+                len(retained_indices),
+                len(frame_timestamps_ns),
+                session_dir.name,
+            )
 
             first_frame, next_frame_index = _read_frame_array(
                 video_reader=video_reader,
@@ -95,6 +132,11 @@ def convert_sessions(
                 next_frame_index=None,
             )
             if dataset is None:
+                logger.info(
+                    "Creating LeRobot dataset %s at %s",
+                    repo_id,
+                    output_root,
+                )
                 dataset = LeRobotDataset.create(
                     repo_id=repo_id,
                     fps=fps,
@@ -105,6 +147,7 @@ def convert_sessions(
                 )
 
             _write_session_episode(
+                session_name=session_dir.name,
                 dataset=dataset,
                 video_reader=video_reader,
                 frame_timestamps_ns=frame_timestamps_ns,
@@ -117,14 +160,18 @@ def convert_sessions(
                 next_frame_index=next_frame_index,
             )
             converted_sessions.append(session_dir.name)
+            logger.info("Converted session %s", session_dir.name)
         except Exception as exc:
             if strict:
+                logger.exception("Failed converting session %s", session_dir.name)
                 raise
+            logger.warning("Skipping session %s: %s", session_dir.name, exc)
             skipped_sessions[session_dir.name] = str(exc)
 
     if dataset is None:
         raise ValueError("no valid sessions were converted")
 
+    logger.info("Finalizing dataset at %s", dataset.root)
     dataset.finalize()
     metadata = ConversionMetadata(
         game_id=game_definition.game_id,
@@ -139,6 +186,11 @@ def convert_sessions(
     )
     apply_converter_metadata(dataset.meta.info, metadata)
     write_info(dataset.meta.info, dataset.root)
+    logger.info(
+        "Conversion complete: %d converted, %d skipped",
+        len(converted_sessions),
+        len(skipped_sessions),
+    )
     return ConversionResult(
         converted_sessions=tuple(converted_sessions),
         skipped_sessions=skipped_sessions,
@@ -156,6 +208,7 @@ def _resolve_expected_fps(expected_fps: int | None, fps: int) -> int:
 
 def _write_session_episode(
     *,
+    session_name: str,
     dataset: LeRobotDataset,
     video_reader,
     frame_timestamps_ns: list[int],
@@ -173,7 +226,14 @@ def _write_session_episode(
     snapshot_index = 0
     current_snapshot = baseline
 
-    for retained_position, frame_index in enumerate(retained_indices):
+    total_frames = len(retained_indices)
+    logger.info(
+        "Writing session %s episode with %d frame(s)", session_name, total_frames
+    )
+
+    for retained_position, frame_index in tqdm(
+        enumerate(retained_indices), "Writing episode.", total=total_frames
+    ):
         frame_timestamp = frame_timestamps_ns[frame_index]
         while (
             snapshot_index < len(snapshots)
@@ -198,8 +258,17 @@ def _write_session_episode(
                 "task": task,
             }
         )
+        frames_written = retained_position + 1
+        if frames_written == total_frames or frames_written % 100 == 0:
+            logger.info(
+                "Writing session %s: %d/%d frames",
+                session_name,
+                frames_written,
+                total_frames,
+            )
 
     dataset.save_episode()
+    logger.info("Saved episode for session %s", session_name)
 
 
 def _read_frame_array(*, video_reader, frame_index: int, next_frame_index: int | None):
