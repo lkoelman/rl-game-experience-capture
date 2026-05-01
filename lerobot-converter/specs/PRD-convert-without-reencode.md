@@ -1,0 +1,4 @@
+Read the LeRobotDataset source code and find out whether it's technically feasible to convert recorded gameplay sessions to the LeRobotDataset format without re-encoding videos. Currently, our recorded gameplay sessions include an .mp4 video file. During the conversion to LeRobotDataset, we extract all the frames from the video: LeRobotDataset then re-encodes these into a new video. The goal is to bypass the re-encoding step. After inspecting the LeRobotDataset source code, first propose different strategies to achieve this (for example, through inheritance, patch functions, ...). Ask user feedback and clarifying questions before writing the full implementation plan.
+
+
+The LeRobotDataset source code is cloned locally in ~/workspace/lerobot . The key file in the repo is `src/lerobot/datasets/lerobot_dataset.py` containing the LeRobotDataset class implementation.
