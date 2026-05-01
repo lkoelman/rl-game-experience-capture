@@ -27,7 +27,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--repo-id", required=True)
     parser.add_argument("--task", required=True)
-    parser.add_argument("--max-pre-action-seconds", type=float, required=True)
+    parser.add_argument("--max-pre-action-seconds", type=float)
+    parser.add_argument(
+        "--no-reencode",
+        action="store_true",
+        help="Write source MP4 video into the LeRobot dataset without re-encoding.",
+    )
     parser.add_argument("--strict", action="store_true")
     parser.add_argument(
         "--verbosity",
@@ -54,5 +59,6 @@ def main(argv: list[str] | None = None):
         repo_id=args.repo_id,
         task=args.task,
         max_pre_action_seconds=args.max_pre_action_seconds,
+        no_reencode=args.no_reencode,
         strict=args.strict,
     )

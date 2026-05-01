@@ -1,0 +1,1 @@
+This is a monorepository containing packages implemented in python and C++. Packages may have their own AGENTS.md and README.md files. When making changes involving multiple packages, read the AGENTS.md and documentation of the packages involved first.

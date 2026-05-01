@@ -31,7 +31,7 @@ def validate_session_dir(session_dir: Path) -> SessionValidationResult:
 def trim_idle_frame_indices(
     frame_timestamps_ns: list[int],
     first_action_timestamp_ns: int | None,
-    max_pre_action_seconds: float,
+    max_pre_action_seconds: float | None,
 ) -> list[int]:
     """Trim the leading idle region while preserving the original frame cadence.
 
@@ -40,7 +40,7 @@ def trim_idle_frame_indices(
     amount of context before it.
     """
 
-    if first_action_timestamp_ns is None:
+    if first_action_timestamp_ns is None or max_pre_action_seconds is None:
         return list(range(len(frame_timestamps_ns)))
 
     max_pre_action_ns = int(max_pre_action_seconds * 1_000_000_000)

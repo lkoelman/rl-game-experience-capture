@@ -18,6 +18,7 @@ from game2lerobot import (
     apply_converter_metadata,
     build_action_layout,
     collect_session_dirs,
+    read_sync_rows,
     trim_idle_frame_indices,
     convert_sessions,
     encode_action_vector,
@@ -60,6 +61,18 @@ def test_trim_idle_frame_indices_uses_pre_action_limit():
     )
 
     assert retained == [1, 2, 3]
+
+
+def test_trim_idle_frame_indices_keeps_all_frames_when_limit_is_omitted():
+    frame_timestamps = [1_000_000_000, 1_500_000_000, 2_000_000_000]
+
+    retained = trim_idle_frame_indices(
+        frame_timestamps_ns=frame_timestamps,
+        first_action_timestamp_ns=2_000_000_000,
+        max_pre_action_seconds=None,
+    )
+
+    assert retained == [0, 1, 2]
 
 
 def test_build_action_layout_and_encode_vector():
@@ -121,6 +134,7 @@ def test_apply_converter_metadata_uses_namespaced_extension():
         task="Clear the zone",
         strict=False,
         max_pre_action_seconds=1.5,
+        no_reencode=False,
         action_layout=(
             ActionLayoutEntry(action_id="move", start=0, size=2, kind="vector2"),
             ActionLayoutEntry(action_id="strike", start=2, size=1, kind="digital"),
@@ -164,6 +178,7 @@ def test_read_sync_csv_and_actions_bin_round_trip(tmp_path: Path):
     )
 
     assert read_sync_csv(sync_path) == [1000, 2000]
+    assert read_sync_rows(sync_path)[1].pts_ns == 33333333
 
     actions = read_actions_bin(actions_path)
 
@@ -520,6 +535,117 @@ def test_convert_sessions_streams_frames_from_video_reader(
         int(frame["observation.images.main"][0, 0, 0])
         for frame in FakeDataset.last_created.frames
     ] == [20, 30]
+
+
+def test_convert_sessions_no_reencode_uses_existing_video_without_add_frame(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    batch_root = tmp_path / "sessions"
+    batch_root.mkdir()
+    valid = batch_root / "session_valid"
+    valid.mkdir()
+    _write_video(
+        valid / "capture.mp4",
+        [
+            np.full((32, 32, 3), 10, dtype=np.uint8),
+            np.full((32, 32, 3), 20, dtype=np.uint8),
+        ],
+        fps=30,
+    )
+    (valid / "sync.csv").write_text(
+        "frame_index,monotonic_ns,pts\n0,1000000000,0\n1,1033333333,33333333\n"
+    )
+    _write_actions_bin(
+        valid / "actions.bin",
+        [
+            GamepadSnapshot(
+                monotonic_ns=1010000000,
+                axes=(0.5, -0.5, 0.0, 0.0, 0.9),
+                pressed_buttons=(1,),
+                pressed_keys=(),
+            ),
+        ],
+    )
+    game_definition_path = tmp_path / "game-definition.yaml"
+    game_definition_path.write_text(
+        yaml.safe_dump(
+            {
+                "game_id": "test_game",
+                "display_name": "Test Game",
+                "classes": [
+                    {
+                        "id": "default",
+                        "label": "Default",
+                        "actions": [
+                            {"id": "move", "label": "Move", "kind": "vector2"},
+                            {"id": "attack", "label": "Attack", "kind": "digital"},
+                            {"id": "heavy", "label": "Heavy", "kind": "trigger"},
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+    action_mapping_path = tmp_path / "action-mapping.yaml"
+    action_mapping_path.write_text(
+        yaml.safe_dump(
+            {
+                "game_id": "test_game",
+                "class_ids": ["default"],
+                "profile_name": "test-profile",
+                "complete": False,
+                "actions": {
+                    "move": {
+                        "skipped": False,
+                        "bindings": [{"type": "stick", "control": "left_stick"}],
+                    },
+                    "attack": {
+                        "skipped": False,
+                        "bindings": [{"type": "button", "control": "south"}],
+                    },
+                    "heavy": {
+                        "skipped": False,
+                        "bindings": [
+                            {
+                                "type": "trigger",
+                                "control": "right_trigger",
+                                "threshold": 0.5,
+                            }
+                        ],
+                    },
+                },
+            }
+        )
+    )
+
+    def fail_encode_video_frames(*_args, **_kwargs):
+        raise AssertionError("no-reencode conversion must not encode video frames")
+
+    monkeypatch.setattr(
+        "lerobot.datasets.dataset_writer.encode_video_frames",
+        fail_encode_video_frames,
+    )
+
+    result = convert_sessions(
+        session_root=batch_root,
+        game_definition=load_game_definition(game_definition_path),
+        action_mapping=load_action_mapping_profile(action_mapping_path),
+        output_root=tmp_path / "out",
+        repo_id="local/test_dataset",
+        task="Defeat enemies",
+        max_pre_action_seconds=None,
+        strict=True,
+        no_reencode=True,
+    )
+
+    info = result.dataset.meta.info
+    assert info["total_episodes"] == 1
+    assert info["total_frames"] == 2
+    assert info["extensions"]["game_converter"]["settings"]["no_reencode"] is True
+    video_path = result.dataset.root / result.dataset.meta.video_path.format(
+        video_key="observation.images.main", chunk_index=0, file_index=0
+    )
+    assert video_path.read_bytes() == (valid / "capture.mp4").read_bytes()
 
 
 def _write_video(path: Path, frames: list[np.ndarray], fps: int) -> None:

@@ -19,6 +19,7 @@ from .models import (
     BindingType,
     ConversionMetadata,
     ConversionResult,
+    FrameSyncRow,
     GameClass,
     GameDefinition,
     GamepadSnapshot,
@@ -30,6 +31,7 @@ from .parsing import (
     open_video_reader,
     read_actions_bin,
     read_sync_csv,
+    read_sync_rows,
 )
 from .pipeline import convert_sessions
 
@@ -41,6 +43,7 @@ __all__ = [
     "BindingType",
     "ConversionMetadata",
     "ConversionResult",
+    "FrameSyncRow",
     "GameClass",
     "GameDefinition",
     "GamepadSnapshot",
@@ -58,5 +61,6 @@ __all__ = [
     "open_video_reader",
     "read_actions_bin",
     "read_sync_csv",
+    "read_sync_rows",
     "validate_session_dir",
 ]

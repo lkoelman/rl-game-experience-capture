@@ -90,6 +90,21 @@ class GamepadSnapshot:
 
 
 @dataclass(frozen=True)
+class FrameSyncRow:
+    """One `sync.csv` row tying recorder time to video timeline position.
+
+    Fields:
+    - `frame_index`: Source capture frame index from the recorder.
+    - `monotonic_ns`: Recorder monotonic timestamp used to align actions.
+    - `pts_ns`: Video presentation timestamp used for no-reencode remuxing.
+    """
+
+    frame_index: int
+    monotonic_ns: int
+    pts_ns: int
+
+
+@dataclass(frozen=True)
 class SessionValidationResult:
     """Validation result for a discovered session directory.
 
@@ -155,7 +170,7 @@ class ConversionMetadata:
 
     Fields:
     - `game_id`, `class_ids`, `profile_name`: Source identity for the action space.
-    - `task`, `strict`, `max_pre_action_seconds`: Conversion settings that affect dataset semantics.
+    - `task`, `strict`, `max_pre_action_seconds`, `no_reencode`: Conversion settings that affect dataset semantics.
     - `action_layout`: Description of the emitted dense action vector.
     - `converted_sessions`, `skipped_sessions`: Batch outcomes for provenance and debugging.
     """
@@ -165,7 +180,8 @@ class ConversionMetadata:
     profile_name: str
     task: str
     strict: bool
-    max_pre_action_seconds: float
+    max_pre_action_seconds: float | None
+    no_reencode: bool
     action_layout: tuple[ActionLayoutEntry, ...]
     converted_sessions: tuple[str, ...]
     skipped_sessions: dict[str, str]

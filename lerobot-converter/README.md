@@ -13,10 +13,15 @@ uv run game2lerobot \
   --action-mapping ../trajectory-recorder-cpp/configs/action-mapping-example.yaml \
   --output-root ./output/path-of-exile-2 \
   --repo-id local/path_of_exile_2 \
-  --task "Clear the zone" \
-  --max-pre-action-seconds 1.0
+  --task "Clear the zone"
 ```
 
+Use `--max-pre-action-seconds 1.0` to trim leading idle video while keeping up
+to one second of context before the first action. When this option is omitted,
+the converter keeps the full source video timeline.
+Use `--no-reencode` to place each recorded MP4 into the LeRobot dataset without
+decoding and re-encoding the video stream. If `--no-reencode` is combined with
+an explicit pre-action trim, the converter attempts a stream-copy remuxed trim.
 Add `--strict` to fail the run when any discovered session directory is invalid instead of skipping it.
 Use `--verbosity debug|info|warning|error|critical` to control CLI logging output.
 

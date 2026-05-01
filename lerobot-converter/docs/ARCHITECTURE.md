@@ -60,6 +60,7 @@ In practical terms:
    - `--repo-id`
    - `--task`
    - `--max-pre-action-seconds`
+   - `--no-reencode`
    - `--strict`
 2. YAML inputs are parsed into in-memory domain models.
 3. Session directories are discovered under the batch root.
@@ -68,10 +69,10 @@ In practical terms:
    - video frames are decoded from `capture.mp4`
    - frame timestamps are read from `sync.csv`
    - raw gamepad snapshots are read from `actions.bin`
-   - the converter trims leading idle video according to `--max-pre-action-seconds`
+   - the converter trims leading idle video according to `--max-pre-action-seconds` when provided
    - each retained frame is aligned to the latest gamepad snapshot at or before that frame
    - the aligned snapshot is encoded into the dense `action` vector
-   - frames are written into the current LeRobot episode
+   - frames are written into the current LeRobot episode, or `--no-reencode` writes the episode rows while preserving the encoded MP4 stream
 6. The episode is saved.
 7. After all sessions:
    - the dataset is finalized
@@ -157,6 +158,7 @@ Change this module when:
 Owns all source-file parsing:
 
 - `read_sync_csv()`
+- `read_sync_rows()`
 - `read_actions_bin()`
 - `load_game_definition()`
 - `load_action_mapping_profile()`
@@ -164,7 +166,7 @@ Owns all source-file parsing:
 
 Important details:
 
-- `sync.csv` is treated as the authoritative frame timestamp sequence
+- `sync.csv` is treated as the authoritative frame timestamp sequence; `read_sync_rows()` also preserves video PTS for no-reencode remuxing
 - `actions.bin` is read as a stream of little-endian length-prefixed protobuf payloads
 - the protobuf schema is constructed dynamically in `_get_gamepad_state_message()`
 - YAML parsing is intentionally permissive and currently extracts only the fields used by the v1 pipeline
@@ -333,13 +335,16 @@ uv run game2lerobot \
   --output-root <dir> \
   --repo-id <repo-id> \
   --task <text> \
-  --max-pre-action-seconds <float> \
+  [--max-pre-action-seconds <float>] \
+  [--no-reencode] \
   [--strict]
 ```
 
 Behavior:
 
 - default mode skips invalid sessions and records the reason
+- omitted `--max-pre-action-seconds` keeps the full source timeline
+- `--no-reencode` preserves encoded MP4 video packets instead of using LeRobot's encoder
 - `--strict` fails on the first invalid session
 
 ### Python Library Interface
@@ -479,7 +484,7 @@ When changing behavior:
 
 ### Codec Constraint
 
-Dataset writing currently forces `vcodec="h264"` when creating the LeRobot dataset.
+Default dataset writing currently forces `vcodec="h264"` when creating the LeRobot dataset.
 
 Reason:
 
@@ -488,6 +493,21 @@ Reason:
 Implication:
 
 - if you change video encoding, rerun full tests and verify the writer path in this environment
+
+### No-Reencode Constraint
+
+`--no-reencode` bypasses LeRobot's PNG-to-MP4 encoder for video observations.
+
+Current behavior:
+
+- when `--max-pre-action-seconds` is omitted, the original session MP4 is copied into the LeRobot video layout
+- when trimming is requested, the converter attempts an ffmpeg stream-copy remux instead of encoding decoded frames
+- observation stats are still computed by decoding sampled retained frames
+
+Implication:
+
+- no-reencode output depends on source MP4 compatibility for LeRobot decoding and stream-copy concatenation
+- trimming is constrained by what MP4 stream copy can represent safely
 
 ### FPS Constraint
 

@@ -19,6 +19,7 @@ from .models import (
     ActionDefinition,
     ActionMappingProfile,
     BindingType,
+    FrameSyncRow,
     GameClass,
     GameDefinition,
     GamepadSnapshot,
@@ -30,9 +31,26 @@ _GAMEPAD_STATE_MESSAGE = None
 def read_sync_csv(path: Path) -> list[int]:
     """Read recorder frame timestamps from `sync.csv` in capture order."""
 
+    return [row.monotonic_ns for row in read_sync_rows(path)]
+
+
+def read_sync_rows(path: Path) -> list[FrameSyncRow]:
+    """Read recorder frame sync rows from `sync.csv` in capture order.
+
+    The no-reencode writer needs both the monotonic timestamp for action
+    alignment and the video PTS for stream-copy trimming.
+    """
+
     with path.open(newline="") as handle:
         reader = csv.DictReader(handle)
-        return [int(row["monotonic_ns"]) for row in reader]
+        return [
+            FrameSyncRow(
+                frame_index=int(row["frame_index"]),
+                monotonic_ns=int(row["monotonic_ns"]),
+                pts_ns=int(row["pts"]),
+            )
+            for row in reader
+        ]
 
 
 def read_actions_bin(path: Path) -> list[GamepadSnapshot]:

@@ -25,6 +25,7 @@ def apply_converter_metadata(info: dict, metadata: ConversionMetadata) -> None:
             "task": metadata.task,
             "strict": metadata.strict,
             "max_pre_action_seconds": metadata.max_pre_action_seconds,
+            "no_reencode": metadata.no_reencode,
         },
         "action_layout": [asdict(entry) for entry in metadata.action_layout],
         "converted_sessions": list(metadata.converted_sessions),

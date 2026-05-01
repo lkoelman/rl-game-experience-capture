@@ -33,7 +33,8 @@ from .models import (
     GameDefinition,
     GamepadSnapshot,
 )
-from .parsing import open_video_reader, read_actions_bin, read_sync_csv
+from .no_reencode import save_episode_without_reencoding
+from .parsing import open_video_reader, read_actions_bin, read_sync_rows
 
 
 logger = logging.getLogger(__name__)
@@ -47,8 +48,9 @@ def convert_sessions(
     output_root: Path,
     repo_id: str,
     task: str,
-    max_pre_action_seconds: float,
+    max_pre_action_seconds: float | None,
     strict: bool,
+    no_reencode: bool = False,
 ) -> ConversionResult:
     """Convert a batch root of recorded sessions into one LeRobot dataset.
 
@@ -96,7 +98,8 @@ def convert_sessions(
         try:
             logger.info("Reading session artifacts for %s", session_dir.name)
             video_reader, fps = open_video_reader(session_dir / "capture.mp4")
-            frame_timestamps_ns = read_sync_csv(session_dir / "sync.csv")
+            sync_rows = read_sync_rows(session_dir / "sync.csv")
+            frame_timestamps_ns = [row.monotonic_ns for row in sync_rows]
             snapshots = read_actions_bin(session_dir / "actions.bin")
             if len(video_reader) != len(frame_timestamps_ns):
                 raise ValueError("frame count does not match sync.csv entries")
@@ -146,19 +149,33 @@ def convert_sessions(
                     vcodec="h264",
                 )
 
-            _write_session_episode(
-                session_name=session_dir.name,
-                dataset=dataset,
-                video_reader=video_reader,
-                frame_timestamps_ns=frame_timestamps_ns,
-                retained_indices=retained_indices,
-                snapshots=snapshots,
-                bindings_by_action=action_mapping.bindings_by_action,
-                layout=layout,
-                task=task,
-                first_frame=first_frame,
-                next_frame_index=next_frame_index,
-            )
+            if no_reencode:
+                save_episode_without_reencoding(
+                    session_name=session_dir.name,
+                    dataset=dataset,
+                    source_video_path=session_dir / "capture.mp4",
+                    video_reader=video_reader,
+                    sync_rows=sync_rows,
+                    retained_indices=retained_indices,
+                    snapshots=snapshots,
+                    bindings_by_action=action_mapping.bindings_by_action,
+                    layout=layout,
+                    task=task,
+                )
+            else:
+                _write_session_episode(
+                    session_name=session_dir.name,
+                    dataset=dataset,
+                    video_reader=video_reader,
+                    frame_timestamps_ns=frame_timestamps_ns,
+                    retained_indices=retained_indices,
+                    snapshots=snapshots,
+                    bindings_by_action=action_mapping.bindings_by_action,
+                    layout=layout,
+                    task=task,
+                    first_frame=first_frame,
+                    next_frame_index=next_frame_index,
+                )
             converted_sessions.append(session_dir.name)
             logger.info("Converted session %s", session_dir.name)
         except Exception as exc:
@@ -180,6 +197,7 @@ def convert_sessions(
         task=task,
         strict=strict,
         max_pre_action_seconds=max_pre_action_seconds,
+        no_reencode=no_reencode,
         action_layout=tuple(layout),
         converted_sessions=tuple(converted_sessions),
         skipped_sessions=skipped_sessions,
