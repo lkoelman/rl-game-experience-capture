@@ -4,10 +4,10 @@
   <img src="docs/assets/path-of-exile_PoE2_icon.png" alt="Path of Exile 2" height="72" style="vertical-align: middle;" />
 </p>
 
-<h1 align="center">LeGamer</h1>
+<h1 align="center">Arpeggio Suite</h1>
 
 <p align="center">
-  Record your gaming sessions. Turn it into training data. Train policies to play any video game.
+  Record ARPG gaming sessions with gamepad actions. Turn them into training data. Train policies to play any video game.
 </p>
 
 
@@ -20,7 +20,7 @@
 </p>
 
 
-LeGamer is a monorepo for training action foundation models to play AAA video games: capture synchronized gameplay sessions, map raw controller input to in-game actions, convert recordings into `LeRobotDataset` format, and prepare for a future where custom agents can assist you, imitate your style, and eventually compete against each other.
+Arpeggio Suite is a monorepo for training action foundation models to play AAA video games: capture synchronized gameplay sessions, map raw controller input to in-game actions, convert recordings into `LeRobotDataset` format, and prepare for a future where custom agents can assist you, imitate your style, and eventually compete against each other.
 
 The core idea is simple:
 
@@ -29,7 +29,7 @@ The core idea is simple:
 3. Export those sessions into a training-friendly dataset.
 4. Train agents that can learn from your play and improve over time.
 
-## Why LeGamer
+## Why Arpeggio
 
 This repo is aimed at training policies to play real AAA games with a minimal, user-friendly setup, without privileged state information. It lets you experiment with action foundation models that are typically used in Robotics, but in a more fun and accessible environment:
 
@@ -92,7 +92,23 @@ If you want to use the repo today, the practical loop looks like this:
 5. Convert batches of sessions with `game2lerobot`.
 6. Train downstream models with the exported LeRobot dataset.
 
-Example converter command:
+Example workflow:
+
+```powershell
+# (one-off) define in-game actions
+edit my-game-definition.yaml
+
+# (one-off) interactive gamepad mapping, save to config
+.\builddir\map_actions.exe my-game-definition.yaml
+
+# record video + gamepad inputs
+.\builddir\record_session.exe .\data poe2_session_01
+
+# validate recordings
+.\builddir\validate_recording.exe .\data --json
+```
+
+Convert to LeRobotDataset format for VLA/WAM training:
 
 ```bash
 cd lerobot-converter
@@ -102,25 +118,17 @@ uv run game2lerobot \
   --action-mapping ../trajectory-recorder-cpp/configs/action-mapping-example.yaml \
   --output-root ./output/path-of-exile-2 \
   --repo-id local/path_of_exile_2 \
-  --task "Clear the zone" \
-  --max-pre-action-seconds 1.0
+  --task "Clear the zone"
 ```
 
-Example recorder tools:
 
-```powershell
-.\builddir\map_actions.exe .\configs\path-of-exile-2-game-definition.yaml
-.\builddir\record_session.exe .\data poe2_session_01 --window "Path of Exile 2"
-.\builddir\validate_recording.exe .\data --json
-```
 
 ## What’s Coming Next
 
-The roadmap in [agents/ROADMAP.md](./agents/ROADMAP.md) points toward a full game-agent training stack.
+The roadmap in [agents/ROADMAP.md](./agents/ROADMAP.md) aims to work toward a full game-agent training stack.
 
 Planned next steps include:
 
-- improving and documenting the LeRobot conversion workflow with example recordings and mappings
 - training a baseline model on captured gameplay
 - exploring stronger model families for video action modeling
 - adding reward modeling for RL-focused training

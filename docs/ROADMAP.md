@@ -11,8 +11,9 @@
 - [ ] LeRobotDataset converter
     - convert our recording sessions to LeRobotDataset format for easy training with PyTorch and HuggingFace libraries
     - [X] write PRD with reference to the example recording and action mapping
-    - [ ] record real PoE2 game session
-    - [ ] do conversion and identify painpoints, fixes, enhancements
+    - [X] record real PoE2 game session
+    - [X] do conversion and identify painpoints, fixes, enhancements
+        - added no-reencode conversion path
 
 - [ ] (Optional) Reward modeling for RL
     - can skip this if we start with Imitation Learning / Behavioural Cloning
